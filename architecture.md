@@ -87,7 +87,7 @@ flowchart LR
 ```
 
 В dev-режиме фронтенд обращается к бэкенду через прокси Vite
-(`/api -> http://localhost:8000`), что снимает необходимость в
+(`/api -> http://localhost:18080`), что снимает необходимость в
 CORS-настройках при разработке. CORS middleware на бэкенде всё
 равно включается для устойчивости при других сценариях запуска.
 
@@ -136,7 +136,7 @@ CORS-настройках при разработке. CORS middleware на бэ
         NotesPanel.jsx / NoteEditor.jsx / AskNotesBar.jsx
         Planner.jsx           # матрица Эйзенхауэра / фокус на день
         DigestCard.jsx
-    vite.config.js         # dev-proxy /api -> localhost:8000
+    vite.config.js         # dev-proxy /api -> localhost:18080
     package.json
     .eslintrc.cjs / .prettierrc
 ```

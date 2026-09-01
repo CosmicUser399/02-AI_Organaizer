@@ -1,0 +1,1 @@
+"""AI-Органайзер Backend Application."""

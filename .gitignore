@@ -1,12 +1,41 @@
-node_modules/
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
 .venv/
-dist/
-*.log
-.env
-.cache/
+venv/
+env/
+ENV/
+*.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Generated vector index (build locally)
+# Node
+node_modules/
+dist/
+build/
+.cache/
+
+# Environment
+.env
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated vector index
 data/vector_db/*
 !data/vector_db/.gitkeep
