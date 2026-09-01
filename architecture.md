@@ -12,6 +12,9 @@
   регистрации и логина.
 - Архитектура: отдельные **backend** (FastAPI) и **frontend**
   (React + MUI, Vite), взаимодействующие по REST API.
+- **Контейнеризация**: Docker + Docker Compose для изоляции
+  окружения и упрощения развёртывания (опционально, доступен
+  также локальный запуск без Docker).
 
 ## Стек технологий
 
@@ -51,6 +54,19 @@
   как JSON-поле в SQLite, косинусная близость считается в Python
   (достаточно для локального однопользовательского масштаба).
 
+### Контейнеризация (Docker)
+
+- **Docker** — для изоляции окружения и воспроизводимых сборок.
+- **Docker Compose** — оркестрация backend и frontend контейнеров.
+- **Два режима**:
+  - `docker-compose.yml` — development с hot-reload и volume
+    mount для исходников.
+  - `docker-compose.prod.yml` — production с nginx для frontend
+    и оптимизированными образами.
+- **Multi-stage builds** — frontend собирается через промежуточный
+  образ builder, итоговый production образ содержит только
+  статику + nginx (легковесный).
+
 ## Архитектурная диаграмма
 
 ```mermaid
@@ -86,10 +102,17 @@ flowchart LR
     InsightsAPI --> AIService
 ```
 
-В dev-режиме фронтенд обращается к бэкенду через прокси Vite
-(`/api -> http://localhost:18080`), что снимает необходимость в
-CORS-настройках при разработке. CORS middleware на бэкенде всё
-равно включается для устойчивости при других сценариях запуска.
+В dev-режиме через Docker фронтенд обращается к бэкенду через прокси
+Vite (`/api -> http://backend:18080`). Имя `backend` доступно только
+внутри Docker-сети; браузер обращается к frontend на
+`http://localhost:5173`. CORS middleware на бэкенде всё равно
+включается для устойчивости при других сценариях запуска.
+
+Роутер задач FastAPI объявлен с завершающим `/`. Поэтому frontend
+должен использовать `/api/tasks/` для коллекции задач (GET, POST и
+DELETE all). Запрос без завершающего `/` получает HTTP 307 и может
+перенаправить браузер на внутренний адрес `backend:18080`, который
+недоступен с хост-машины.
 
 ## Структура проекта
 
@@ -101,6 +124,8 @@ CORS-настройках при разработке. CORS middleware на бэ
   .env.example          # шаблон без секретов
   .gitignore
   README.md
+  docker-compose.yml         # Docker Compose для development
+  docker-compose.prod.yml    # Docker Compose для production
   backend/
     app/
       main.py            # FastAPI app, CORS, роутеры, логирование
@@ -123,6 +148,8 @@ CORS-настройках при разработке. CORS middleware на бэ
         digest.py                  # вечерний дайджест
     requirements.txt
     pyproject.toml         # ruff/black/isort (line-length=79)
+    Dockerfile             # образ для backend
+    .dockerignore
   frontend/
     src/
       main.jsx
@@ -136,9 +163,12 @@ CORS-настройках при разработке. CORS middleware на бэ
         NotesPanel.jsx / NoteEditor.jsx / AskNotesBar.jsx
         Planner.jsx           # матрица Эйзенхауэра / фокус на день
         DigestCard.jsx
-    vite.config.js         # dev-proxy /api -> localhost:18080
+    vite.config.js         # dev-proxy /api -> backend:18080
     package.json
-    .eslintrc.cjs / .prettierrc
+    eslint.config.js / .prettierrc
+    Dockerfile             # multi-stage образ для frontend
+    .dockerignore
+    nginx.conf             # конфигурация nginx для production
 ```
 
 ## Модель данных (SQLite)

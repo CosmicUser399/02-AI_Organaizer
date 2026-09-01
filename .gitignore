@@ -39,3 +39,7 @@ Thumbs.db
 # Generated vector index
 data/vector_db/*
 !data/vector_db/.gitkeep
+
+# Docker
+.dockerignore
+docker-compose.override.yml

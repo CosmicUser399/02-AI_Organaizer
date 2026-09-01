@@ -28,13 +28,66 @@
 
 ## Установка и запуск
 
-### Предварительные требования
+### Вариант 1: Запуск через Docker (рекомендуется)
+
+> 📘 Полная документация по Docker: [DOCKER.md](DOCKER.md)
+
+#### Предварительные требования
+
+- Docker и Docker Compose
+- OpenAI API ключ
+
+#### Настройка и запуск
+
+1. Создайте файл `.env` в корне проекта:
+
+```bash
+OPENAI_API_KEY=sk-your-openai-api-key-here
+OPENAI_CHAT_MODEL=gpt-4o-mini
+EMBEDDING_MODEL=text-embedding-3-small
+API_BASE_URL=http://localhost:18080
+```
+
+2. Запустите приложение:
+
+```bash
+# Development режим (с hot-reload)
+docker-compose up
+
+# Production режим
+docker-compose -f docker-compose.prod.yml up -d
+
+# Остановка
+docker-compose down
+
+# Пересборка после изменений
+docker-compose up --build
+```
+
+**Приложение будет доступно:**
+- Frontend (dev): http://localhost:5173
+- Frontend (prod): http://localhost:80
+- Backend API: http://localhost:18080
+- API документация: http://localhost:18080/docs
+
+В Docker development-режиме frontend использует Vite-прокси
+`/api -> http://backend:18080`. В браузере используются только
+относительные API-адреса `/api/...`; имя `backend` доступно только
+внутри Docker-сети. Для списка задач используйте завершающий `/`:
+`/api/tasks/`. Это предотвращает перенаправление HTTP 307 на
+недоступный браузеру внутренний адрес.
+
+---
+
+### Вариант 2: Локальный запуск (без Docker)
+
+#### Предварительные требования
 
 - Python 3.11 или выше
 - Node.js 18 или выше
 - OpenAI API ключ
 
-### 1. Настройка окружения
+#### 1. Настройка окружения
 
 Создайте файл `.env` в корне проекта (используйте `.env.example` как шаблон):
 
@@ -45,7 +98,7 @@ EMBEDDING_MODEL=text-embedding-3-small
 API_BASE_URL=http://localhost:18080
 ```
 
-### 2. Запуск Backend
+#### 2. Запуск Backend
 
 ```bash
 # Перейдите в директорию backend
@@ -71,7 +124,7 @@ Backend будет доступен по адресу: http://localhost:18080
 
 Документация API (Swagger): http://localhost:18080/docs
 
-### 3. Запуск Frontend
+#### 3. Запуск Frontend
 
 Откройте новый терминал:
 
@@ -88,7 +141,7 @@ npm run dev
 
 Frontend будет доступен по адресу: http://localhost:5173
 
-### 4. Production сборка
+#### 4. Production сборка (локально)
 
 ```bash
 # Backend: используйте production ASGI сервер
@@ -114,7 +167,9 @@ npm run preview
 │   │   ├── routers/      # API endpoints
 │   │   └── services/     # Бизнес-логика и AI
 │   ├── requirements.txt
-│   └── pyproject.toml
+│   ├── pyproject.toml
+│   ├── Dockerfile
+│   └── .dockerignore
 ├── frontend/             # Frontend приложение
 │   ├── src/
 │   │   ├── main.jsx      # Точка входа
@@ -123,12 +178,18 @@ npm run preview
 │   │   ├── api/          # API клиент
 │   │   └── components/   # React компоненты
 │   ├── vite.config.js
-│   └── package.json
-├── .env                  # Секреты (не в git)
-├── .env.example          # Шаблон переменных
+│   ├── package.json
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   └── nginx.conf
+├── docker-compose.yml       # Docker Compose для dev
+├── docker-compose.prod.yml  # Docker Compose для prod
+├── .env                     # Секреты (не в git)
+├── .env.example             # Шаблон переменных
 ├── .gitignore
-├── spec.md               # Спецификация
-├── architecture.md       # Архитектура
+├── spec.md                  # Спецификация
+├── architecture.md          # Архитектура
+├── DOCKER.md                # Docker документация
 └── README.md
 ```
 
@@ -164,6 +225,37 @@ npm run lint
 npm run format
 ```
 
+### Docker команды
+
+```bash
+# Запуск в development режиме
+docker-compose up
+
+# Запуск в background
+docker-compose up -d
+
+# Остановка
+docker-compose down
+
+# Остановка с удалением volumes (БД)
+docker-compose down -v
+
+# Пересборка образов
+docker-compose build
+
+# Просмотр логов
+docker-compose logs -f
+
+# Запуск production версии
+docker-compose -f docker-compose.prod.yml up -d
+
+# Выполнение команды в контейнере backend
+docker-compose exec backend python -m app.some_script
+
+# Выполнение команды в контейнере frontend
+docker-compose exec frontend npm run lint
+```
+
 ## API Endpoints
 
 - `GET /` - информация о приложении
@@ -184,6 +276,19 @@ SQLite база данных создается автоматически пр�
 - `ChecklistItem` - пункты чек-листов
 - `Note` - заметки
 - `NoteChunk` - фрагменты заметок с embeddings
+
+## Docker файлы
+
+Проект включает полную поддержку Docker для удобного развёртывания:
+
+- `backend/Dockerfile` - образ для Python/FastAPI приложения
+- `frontend/Dockerfile` - multi-stage образ (development + production с nginx)
+- `docker-compose.yml` - оркестрация для development с hot-reload
+- `docker-compose.prod.yml` - оркестрация для production
+- `frontend/nginx.conf` - конфигурация nginx для production
+- `DOCKER.md` - подробная документация по использованию Docker
+
+Подробные инструкции см. в [DOCKER.md](DOCKER.md).
 
 ## Лицензия
 
