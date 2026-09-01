@@ -1,0 +1,12 @@
+node_modules/
+__pycache__/
+.venv/
+dist/
+*.log
+.env
+.cache/
+.pytest_cache/
+
+# Generated vector index (build locally)
+data/vector_db/*
+!data/vector_db/.gitkeep
