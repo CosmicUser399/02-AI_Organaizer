@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
   Typography,
   Chip,
   Button,
-  Alert,
   CircularProgress,
   List,
   ListItem,
@@ -14,8 +13,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-} from '@mui/material'
-import EventRepeatIcon from '@mui/icons-material/EventRepeat'
+} from '@mui/material';
+import EventRepeatIcon from '@mui/icons-material/EventRepeat';
+import ErrorAlert from './ErrorAlert';
+import EmptyState from './EmptyState';
 
 const QUADRANTS = [
   {
@@ -42,16 +43,16 @@ const QUADRANTS = [
     hint: 'Позже или отказаться',
     color: 'default',
   },
-]
+];
 
 function formatDue(value) {
-  if (!value) return 'без срока'
+  if (!value) return 'без срока';
   return new Date(value).toLocaleString('ru-RU', {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
-  })
+  });
 }
 
 function TaskRows({ tasks, onReschedule, reschedulingId }) {
@@ -60,7 +61,7 @@ function TaskRows({ tasks, onReschedule, reschedulingId }) {
       <Typography variant="body2" color="text.secondary">
         Нет задач
       </Typography>
-    )
+    );
   }
 
   return (
@@ -106,70 +107,80 @@ function TaskRows({ tasks, onReschedule, reschedulingId }) {
         </ListItem>
       ))}
     </List>
-  )
+  );
 }
 
 export default function Planner({ api }) {
-  const [schedule, setSchedule] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [reschedulingId, setReschedulingId] = useState(null)
-  const [proposal, setProposal] = useState(null)
-  const [applying, setApplying] = useState(false)
+  const [schedule, setSchedule] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reschedulingId, setReschedulingId] = useState(null);
+  const [proposal, setProposal] = useState(null);
+  const [applying, setApplying] = useState(false);
 
   const loadSchedule = useCallback(async () => {
     try {
-      setLoading(true)
-      setError(null)
-      const data = await api.get('/schedule/today')
-      setSchedule(data)
+      setLoading(true);
+      setError(null);
+      const data = await api.get('/schedule/today');
+      setSchedule(data);
     } catch (err) {
-      setError(err.message || 'Не удалось загрузить расписание')
+      setError(err.message || 'Не удалось загрузить расписание');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [api])
+  }, [api]);
 
   useEffect(() => {
-    loadSchedule()
-  }, [loadSchedule])
+    loadSchedule();
+  }, [loadSchedule]);
 
   const handleReschedule = async (task) => {
     try {
-      setReschedulingId(task.id)
-      setError(null)
-      const result = await api.post(`/tasks/${task.id}/reschedule`, {})
-      setProposal(result)
+      setReschedulingId(task.id);
+      setError(null);
+      const result = await api.post(`/tasks/${task.id}/reschedule`, {});
+      setProposal(result);
     } catch (err) {
-      setError(err.message || 'Не удалось предложить новое время')
+      setError(err.message || 'Не удалось предложить новое время');
     } finally {
-      setReschedulingId(null)
+      setReschedulingId(null);
     }
-  }
+  };
 
   const handleConfirmReschedule = async () => {
-    if (!proposal) return
+    if (!proposal) return;
     try {
-      setApplying(true)
-      setError(null)
+      setApplying(true);
+      setError(null);
       await api.patch(`/tasks/${proposal.task_id}`, {
         due_at: proposal.suggested_due_at,
-      })
-      setProposal(null)
-      await loadSchedule()
+      });
+      setProposal(null);
+      await loadSchedule();
     } catch (err) {
-      setError(err.message || 'Не удалось сохранить новое время')
+      setError(err.message || 'Не удалось сохранить новое время');
     } finally {
-      setApplying(false)
+      setApplying(false);
     }
-  }
+  };
 
   if (loading && !schedule) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
         <CircularProgress />
       </Box>
-    )
+    );
+  }
+
+  if (error && !schedule) {
+    return (
+      <EmptyState
+        message={error}
+        actionLabel="Повторить"
+        onAction={loadSchedule}
+      />
+    );
   }
 
   return (
@@ -182,11 +193,11 @@ export default function Planner({ api }) {
         {schedule?.date ? ` · ${schedule.date}` : ''}
       </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      <ErrorAlert
+        message={error}
+        onClose={() => setError(null)}
+        onRetry={loadSchedule}
+      />
 
       {schedule?.overdue?.length > 0 && (
         <Paper sx={{ p: 2, mb: 2 }}>
@@ -295,5 +306,5 @@ export default function Planner({ api }) {
         </DialogActions>
       </Dialog>
     </Box>
-  )
+  );
 }

@@ -72,6 +72,10 @@
 - **Multi-stage builds** — frontend собирается через промежуточный
   образ builder, итоговый production образ содержит только
   статику + nginx (легковесный).
+- **Vite HMR в Docker**: для корректной работы Hot Module
+  Replacement в контейнере требуется явная конфигурация
+  `hmr.clientPort` и `hmr.host` в `vite.config.js`, а также
+  `watch.usePolling` для надежного отслеживания изменений файлов.
 
 ## Архитектурная диаграмма
 
@@ -125,6 +129,26 @@ docker compose up -d backend
 Это обязательно при изменении версий OpenAI SDK и его HTTP-зависимостей:
 иначе контейнер может продолжить запускаться со старым слоем зависимостей.
 
+**Конфигурация Vite для Docker** (`frontend/vite.config.js`):
+```javascript
+server: {
+  port: 5173,
+  host: '0.0.0.0',
+  hmr: {
+    clientPort: 5173,
+    host: 'localhost',
+  },
+  watch: {
+    usePolling: true,
+  },
+  proxy: { ... }
+}
+```
+Параметры `hmr` обеспечивают корректную работу Hot Module Replacement
+через WebSocket соединение между браузером и Vite dev-сервером в
+контейнере. `usePolling` необходим для надежного отслеживания
+изменений файлов через volume mount.
+
 Роутер задач FastAPI объявлен с завершающим `/`. Поэтому frontend
 должен использовать `/api/tasks/` для коллекции задач (GET, POST и
 DELETE all). Запрос без завершающего `/` получает HTTP 307 и может
@@ -157,6 +181,7 @@ DELETE all). Запрос без завершающего `/` получает H
       ai_organizer.db        # SQLite база данных
     app/
       main.py            # FastAPI app, CORS, роутеры, логирование
+      exceptions.py      # OpenAIServiceError и HTTP-маппинг
       config.py           # pydantic-settings, читает .env
       database.py          # SQLAlchemy engine/session
       models.py             # Task, ChecklistItem, Note, NoteChunk
@@ -191,6 +216,7 @@ DELETE all). Запрос без завершающего `/` получает H
         NotesPanel.jsx / NoteEditor.jsx / AskNotesBar.jsx
         Planner.jsx           # матрица Эйзенхауэра / фокус на день
         DigestCard.jsx
+        ErrorAlert.jsx / EmptyState.jsx
     vite.config.js         # dev-proxy /api -> backend:18080
     package.json
     eslint.config.js / .prettierrc
@@ -307,10 +333,11 @@ cron (Linux/macOS) для ежедневного запуска.
 
 ## История изменений
 
-### 03.09.2026 — Исправление персистентности данных
+### 03.09.2026 — Исправление персистентности данных и HMR в Docker
 
-**Проблема:** База данных создавалась вне Docker volume, что
-приводило к потере данных при пересборке контейнеров.
+**Проблема 1 (персистентность данных):** База данных создавалась вне
+Docker volume, что приводило к потере данных при пересборке
+контейнеров.
 
 **Изменения:**
 - Изменён путь к БД в `backend/app/config.py` с корня проекта на
@@ -322,3 +349,17 @@ cron (Linux/macOS) для ежедневного запуска.
 **Результат:** Данные теперь сохраняются между пересборками
 контейнеров. Добавлена возможность автоматического резервного
 копирования с ротацией старых копий.
+
+**Проблема 2 (HMR в Docker):** Ошибка `ERR_CONNECTION_RESET` при
+попытке подключения к `@react-refresh`, пустой интерфейс приложения.
+Vite dev-сервер не мог корректно установить WebSocket соединение для
+Hot Module Replacement из-за отсутствия явной конфигурации для Docker.
+
+**Изменения:**
+- Добавлена HMR конфигурация в `frontend/vite.config.js`:
+  `hmr: { clientPort: 5173, host: 'localhost' }`
+- Включен polling режим для file watching: `watch: { usePolling: true }`
+- Упрощен `frontend/Dockerfile`: убран дублирующий `--host` флаг из CMD
+
+**Результат:** Vite dev-сервер корректно работает в Docker,
+Hot Module Replacement функционирует, интерфейс загружается без ошибок.

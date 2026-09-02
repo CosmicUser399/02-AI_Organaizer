@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
+from app.exceptions import raise_openai_http
 from app.services.embeddings import index_note, search_notes
 from app.services.notes_ai import (
     analyze_note,
@@ -70,10 +71,10 @@ def ask_notes(
     except Exception as exc:
         db.rollback()
         logger.error("Semantic search failed: %s", str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Не удалось выполнить поиск по заметкам",
-        ) from exc
+        raise_openai_http(
+            exc,
+            fallback="Не удалось выполнить поиск по заметкам.",
+        )
 
     return schemas.NotesAskResponse(
         question=request.question,
@@ -369,10 +370,10 @@ def transform_note_selection(
         ) from exc
     except Exception as exc:
         logger.error("Note transform failed: %s", str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Не удалось преобразовать текст",
-        ) from exc
+        raise_openai_http(
+            exc,
+            fallback="Не удалось преобразовать текст.",
+        )
 
     return schemas.NoteTransformResponse(
         result=result,

@@ -70,7 +70,9 @@ Guidelines:
                others, or relates to goals/priorities
 
 Current datetime: {now}
-""".format(now=datetime.now().isoformat())
+""".format(
+        now=datetime.now().isoformat()
+    )
 
     try:
         parsed = openai_client.structured_completion(

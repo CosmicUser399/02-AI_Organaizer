@@ -3,11 +3,12 @@
 import logging
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app import schemas
 from app.database import get_db
+from app.exceptions import raise_openai_http
 from app.services.digest import get_digest
 
 logger = logging.getLogger(__name__)
@@ -50,9 +51,9 @@ def get_evening_digest(
         )
     except Exception as exc:
         logger.error("Digest generation failed: %s", str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Не удалось сформировать дайджест",
-        ) from exc
+        raise_openai_http(
+            exc,
+            fallback="Не удалось сформировать дайджест.",
+        )
 
     return schemas.DigestResponse.model_validate(payload)

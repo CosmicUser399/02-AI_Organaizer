@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react';
 import {
   Paper,
   Box,
   Typography,
-  Alert,
   CircularProgress,
   Button,
   LinearProgress,
@@ -11,40 +10,41 @@ import {
   List,
   ListItem,
   ListItemText,
-} from '@mui/material'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
-import RefreshIcon from '@mui/icons-material/Refresh'
+} from '@mui/material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ErrorAlert from './ErrorAlert';
 
 export default function DigestCard({ api }) {
-  const [digest, setDigest] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [digest, setDigest] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const loadDigest = useCallback(
     async (refresh = false) => {
       try {
-        setLoading(true)
-        setError(null)
+        setLoading(true);
+        setError(null);
         const query = refresh
           ? '/insights/digest?refresh=true'
-          : '/insights/digest'
-        const data = await api.get(query)
-        setDigest(data)
+          : '/insights/digest';
+        const data = await api.get(query);
+        setDigest(data);
       } catch (err) {
-        setError(err.message || 'Не удалось загрузить дайджест')
+        setError(err.message || 'Не удалось загрузить дайджест');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     },
     [api]
-  )
+  );
 
   useEffect(() => {
-    loadDigest(false)
-  }, [loadDigest])
+    loadDigest(false);
+  }, [loadDigest]);
 
-  const stats = digest?.stats
-  const percent = stats?.completion_percent ?? 0
+  const stats = digest?.stats;
+  const percent = stats?.completion_percent ?? 0;
 
   return (
     <Paper sx={{ p: 2, mt: 3 }}>
@@ -71,9 +71,11 @@ export default function DigestCard({ api }) {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <ErrorAlert
+          message={error}
+          onClose={() => setError(null)}
+          onRetry={() => loadDigest(true)}
+        />
       )}
 
       {loading && !digest ? (
@@ -160,5 +162,5 @@ export default function DigestCard({ api }) {
         </Typography>
       )}
     </Paper>
-  )
+  );
 }

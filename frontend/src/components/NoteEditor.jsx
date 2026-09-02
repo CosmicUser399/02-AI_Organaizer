@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -16,136 +16,146 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
-} from '@mui/material'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
-import LinkIcon from '@mui/icons-material/Link'
+} from '@mui/material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import LinkIcon from '@mui/icons-material/Link';
 
 const TRANSFORM_ACTIONS = [
   { mode: 'summarize', label: 'Кратко' },
   { mode: 'fix_grammar', label: 'Грамматика' },
   { mode: 'tone_business', label: 'Деловой тон' },
   { mode: 'tone_friendly', label: 'Дружелюбный' },
-]
+];
 
 export default function NoteEditor({ open, note, onClose, onSave, api }) {
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [tags, setTags] = useState([])
-  const [tagInput, setTagInput] = useState('')
-  const [linkedTaskId, setLinkedTaskId] = useState(null)
-  const [suggestedTasks, setSuggestedTasks] = useState([])
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
-  const [error, setError] = useState(null)
-  const [selection, setSelection] = useState({ start: 0, end: 0, text: '' })
-  const [transforming, setTransforming] = useState(false)
-  const contentRef = useRef(null)
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [tags, setTags] = useState([]);
+  const [tagInput, setTagInput] = useState('');
+  const [linkedTaskId, setLinkedTaskId] = useState(null);
+  const [suggestedTasks, setSuggestedTasks] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [error, setError] = useState(null);
+  const [selection, setSelection] = useState({ start: 0, end: 0, text: '' });
+  const [transforming, setTransforming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const contentRef = useRef(null);
 
   const loadSuggestedTasks = useCallback(
     async (noteId) => {
       try {
-        setLoadingSuggestions(true)
-        const suggestions = await api.get(`/notes/${noteId}/suggested-tasks`)
-        setSuggestedTasks(suggestions)
+        setLoadingSuggestions(true);
+        const suggestions = await api.get(`/notes/${noteId}/suggested-tasks`);
+        setSuggestedTasks(suggestions);
       } catch {
-        setSuggestedTasks([])
+        setSuggestedTasks([]);
       } finally {
-        setLoadingSuggestions(false)
+        setLoadingSuggestions(false);
       }
     },
     [api]
-  )
+  );
 
   useEffect(() => {
     if (note) {
-      setTitle(note.title || '')
-      setContent(note.content || '')
-      setTags(note.tags || [])
-      setLinkedTaskId(note.linked_task_id || null)
+      setTitle(note.title || '');
+      setContent(note.content || '');
+      setTags(note.tags || []);
+      setLinkedTaskId(note.linked_task_id || null);
       if (note.id) {
-        loadSuggestedTasks(note.id)
+        loadSuggestedTasks(note.id);
       }
     } else {
-      setTitle('')
-      setContent('')
-      setTags([])
-      setLinkedTaskId(null)
-      setSuggestedTasks([])
+      setTitle('');
+      setContent('');
+      setTags([]);
+      setLinkedTaskId(null);
+      setSuggestedTasks([]);
     }
-    setSelection({ start: 0, end: 0, text: '' })
-    setError(null)
-  }, [note, open, loadSuggestedTasks])
+    setSelection({ start: 0, end: 0, text: '' });
+    setError(null);
+    setSaving(false);
+  }, [note, open, loadSuggestedTasks]);
 
   const captureSelection = () => {
-    const field = contentRef.current
-    if (!field) return
-    const start = field.selectionStart
-    const end = field.selectionEnd
+    const field = contentRef.current;
+    if (!field) return;
+    const start = field.selectionStart;
+    const end = field.selectionEnd;
     if (start === end) {
-      setSelection({ start, end, text: '' })
-      return
+      setSelection({ start, end, text: '' });
+      return;
     }
     setSelection({
       start,
       end,
       text: content.slice(start, end),
-    })
-  }
+    });
+  };
 
   const handleTransform = async (mode) => {
     if (!note?.id || !selection.text.trim()) {
-      setError('Сначала сохраните заметку и выделите фрагмент текста')
-      return
+      setError('Сначала сохраните заметку и выделите фрагмент текста');
+      return;
     }
 
     try {
-      setTransforming(true)
-      setError(null)
+      setTransforming(true);
+      setError(null);
       const result = await api.post(`/notes/${note.id}/transform`, {
         selection: selection.text,
         mode,
-      })
-      const next = `${content.slice(0, selection.start)}${result.result}${content.slice(selection.end)}`
-      setContent(next)
-      setSelection({ start: 0, end: 0, text: '' })
+      });
+      const next = `${content.slice(0, selection.start)}${result.result}${content.slice(selection.end)}`;
+      setContent(next);
+      setSelection({ start: 0, end: 0, text: '' });
     } catch (err) {
-      setError(err.message || 'Не удалось преобразовать текст')
+      setError(err.message || 'Не удалось преобразовать текст');
     } finally {
-      setTransforming(false)
+      setTransforming(false);
     }
-  }
+  };
 
   const handleAddTag = (e) => {
     if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault()
-      const newTag = tagInput.trim().toLowerCase()
+      e.preventDefault();
+      const newTag = tagInput.trim().toLowerCase();
       if (!tags.includes(newTag)) {
-        setTags([...tags, newTag])
+        setTags([...tags, newTag]);
       }
-      setTagInput('')
+      setTagInput('');
     }
-  }
+  };
 
   const handleDeleteTag = (tagToDelete) => {
-    setTags(tags.filter((tag) => tag !== tagToDelete))
-  }
+    setTags(tags.filter((tag) => tag !== tagToDelete));
+  };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim() || !content.trim()) {
-      setError('Заголовок и содержимое обязательны')
-      return
+      setError('Заголовок и содержимое обязательны');
+      return;
     }
 
-    onSave({
-      title: title.trim(),
-      content: content.trim(),
-      tags: tags.length > 0 ? tags : undefined,
-      linked_task_id: linkedTaskId,
-    })
-  }
+    try {
+      setSaving(true);
+      setError(null);
+      await onSave({
+        title: title.trim(),
+        content: content.trim(),
+        tags: tags.length > 0 ? tags : undefined,
+        linked_task_id: linkedTaskId,
+      });
+    } catch (err) {
+      setError(err.message || 'Не удалось сохранить заметку');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleLinkTask = (taskId) => {
-    setLinkedTaskId(taskId === linkedTaskId ? null : taskId)
-  }
+    setLinkedTaskId(taskId === linkedTaskId ? null : taskId);
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -285,11 +295,18 @@ export default function NoteEditor({ open, note, onClose, onSave, api }) {
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Отмена</Button>
-        <Button onClick={handleSave} variant="contained">
-          Сохранить
+        <Button onClick={onClose} disabled={saving || transforming}>
+          Отмена
+        </Button>
+        <Button
+          onClick={handleSave}
+          variant="contained"
+          disabled={saving || transforming}
+          startIcon={saving ? <CircularProgress size={16} /> : undefined}
+        >
+          {saving ? 'Сохранение…' : 'Сохранить'}
         </Button>
       </DialogActions>
     </Dialog>
-  )
+  );
 }

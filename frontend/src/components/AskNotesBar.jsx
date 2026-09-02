@@ -1,52 +1,53 @@
-import { useState } from 'react'
+import { useState } from 'react';
 import {
   Paper,
   Box,
   TextField,
   Button,
   Typography,
-  Alert,
   CircularProgress,
   List,
   ListItem,
   ListItemText,
   Chip,
-} from '@mui/material'
-import SearchIcon from '@mui/icons-material/Search'
+  Alert,
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import ErrorAlert from './ErrorAlert';
 
 export default function AskNotesBar({ api }) {
-  const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
-  const [matches, setMatches] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [asked, setAsked] = useState(false)
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [asked, setAsked] = useState(false);
 
   const handleAsk = async (event) => {
-    event.preventDefault()
-    const trimmed = question.trim()
+    event.preventDefault();
+    const trimmed = question.trim();
     if (!trimmed) {
-      setError('Введите вопрос по заметкам')
-      return
+      setError('Введите вопрос по заметкам');
+      return;
     }
 
     try {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
       const result = await api.post('/notes/ask', {
         question: trimmed,
         top_k: 5,
-      })
-      setAnswer(result.answer || '')
-      setMatches(result.matches || [])
-      setAsked(true)
+      });
+      setAnswer(result.answer || '');
+      setMatches(result.matches || []);
+      setAsked(true);
     } catch (err) {
-      setError(err.message || 'Не удалось выполнить поиск')
-      setAsked(false)
+      setError(err.message || 'Не удалось выполнить поиск');
+      setAsked(false);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <Paper sx={{ p: 2, mb: 3 }}>
@@ -57,11 +58,7 @@ export default function AskNotesBar({ api }) {
         Поиск по смыслу: вопрос не обязан совпадать со словами заметки
       </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
 
       <Box
         component="form"
@@ -146,5 +143,5 @@ export default function AskNotesBar({ api }) {
         </>
       )}
     </Paper>
-  )
+  );
 }

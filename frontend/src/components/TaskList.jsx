@@ -1,5 +1,6 @@
-import { List, Paper, Typography, Button, Box } from '@mui/material'
-import TaskItem from './TaskItem'
+import { List, Paper, Button, Box } from '@mui/material';
+import TaskItem from './TaskItem';
+import EmptyState from './EmptyState';
 
 export default function TaskList({
   tasks,
@@ -9,13 +10,7 @@ export default function TaskList({
   api,
 }) {
   if (tasks.length === 0) {
-    return (
-      <Paper sx={{ p: 3, textAlign: 'center' }}>
-        <Typography variant="body1" color="text.secondary">
-          Нет задач. Добавьте новую задачу выше.
-        </Typography>
-      </Paper>
-    )
+    return <EmptyState message="Нет задач. Добавьте новую задачу выше." />;
   }
 
   return (
@@ -42,5 +37,5 @@ export default function TaskList({
         </Button>
       </Box>
     </Paper>
-  )
+  );
 }

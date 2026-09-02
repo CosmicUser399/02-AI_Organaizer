@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
 import {
   TextField,
   Button,
@@ -11,62 +11,67 @@ import {
   Typography,
   Collapse,
   CircularProgress,
-} from '@mui/material'
-import HistoryIcon from '@mui/icons-material/History'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+} from '@mui/material';
+import HistoryIcon from '@mui/icons-material/History';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
-const HISTORY_KEY = 'magic_input_history'
-const MAX_HISTORY_ITEMS = 10
+const HISTORY_KEY = 'magic_input_history';
+const MAX_HISTORY_ITEMS = 10;
 
 export default function MagicInput({ onSubmit, disabled }) {
-  const [input, setInput] = useState('')
-  const [history, setHistory] = useState([])
-  const [showHistory, setShowHistory] = useState(false)
+  const [input, setInput] = useState('');
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem(HISTORY_KEY)
+    const savedHistory = localStorage.getItem(HISTORY_KEY);
     if (savedHistory) {
       try {
-        setHistory(JSON.parse(savedHistory))
+        setHistory(JSON.parse(savedHistory));
       } catch {
         // ignore invalid history
       }
     }
-  }, [])
+  }, []);
 
   const saveToHistory = (text) => {
-    if (!text.trim()) return
+    if (!text.trim()) return;
 
     const newHistory = [text, ...history.filter((item) => item !== text)].slice(
       0,
       MAX_HISTORY_ITEMS
-    )
+    );
 
-    setHistory(newHistory)
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory))
-  }
+    setHistory(newHistory);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
+  };
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!input.trim()) return
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!input.trim()) return;
 
-    saveToHistory(input)
-    onSubmit(input)
-    setInput('')
-    setShowHistory(false)
-  }
+    const text = input;
+    try {
+      await onSubmit(text);
+      saveToHistory(text);
+      setInput('');
+      setShowHistory(false);
+    } catch {
+      // Parent shows the error; keep the input so the user can retry.
+    }
+  };
 
   const handleHistoryClick = (text) => {
-    setInput(text)
-    setShowHistory(false)
-  }
+    setInput(text);
+    setShowHistory(false);
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowUp' && history.length > 0 && !input) {
-      e.preventDefault()
-      setInput(history[0])
+      e.preventDefault();
+      setInput(history[0]);
     }
-  }
+  };
 
   return (
     <Paper sx={{ p: 2 }}>
@@ -129,5 +134,5 @@ export default function MagicInput({ onSubmit, disabled }) {
         </Box>
       </Collapse>
     </Paper>
-  )
+  );
 }

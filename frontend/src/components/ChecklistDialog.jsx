@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -17,111 +17,112 @@ import {
   Chip,
   TextField,
   IconButton,
-} from '@mui/material'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
-import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
-import AddIcon from '@mui/icons-material/Add'
-import DeleteIcon from '@mui/icons-material/Delete'
+} from '@mui/material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 export default function ChecklistDialog({ open, onClose, task, api }) {
-  const [checklist, setChecklist] = useState([])
-  const [suggestions, setSuggestions] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [decomposed, setDecomposed] = useState(false)
-  const [newItemText, setNewItemText] = useState('')
-  const [addingItem, setAddingItem] = useState(false)
+  const [checklist, setChecklist] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [decomposed, setDecomposed] = useState(false);
+  const [newItemText, setNewItemText] = useState('');
+  const [addingItem, setAddingItem] = useState(false);
 
   const loadExistingChecklist = useCallback(async () => {
-    if (!task?.id) return
+    if (!task?.id) return;
 
     try {
-      setLoading(true)
-      const items = await api.get(`/tasks/${task.id}/checklist`)
+      setLoading(true);
+      const items = await api.get(`/tasks/${task.id}/checklist`);
       if (items && items.length > 0) {
-        setChecklist(items)
-        setDecomposed(true)
+        setChecklist(items);
+        setDecomposed(true);
       }
     } catch {
-      setDecomposed(false)
+      setError('Не удалось загрузить чек-лист');
+      setDecomposed(false);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [api, task?.id])
+  }, [api, task?.id]);
 
   useEffect(() => {
     if (open && task?.id) {
-      loadExistingChecklist()
+      loadExistingChecklist();
     }
-  }, [open, task?.id, loadExistingChecklist])
+  }, [open, task?.id, loadExistingChecklist]);
 
   const handleDecompose = async () => {
     try {
-      setLoading(true)
-      setError(null)
-      const result = await api.post(`/tasks/${task.id}/decompose`, {})
-      setChecklist(result.checklist_items || [])
-      setSuggestions(result.suggestions || [])
-      setDecomposed(true)
+      setLoading(true);
+      setError(null);
+      const result = await api.post(`/tasks/${task.id}/decompose`, {});
+      setChecklist(result.checklist_items || []);
+      setSuggestions(result.suggestions || []);
+      setDecomposed(true);
     } catch (err) {
-      setError(err.message || 'Не удалось разбить задачу')
+      setError(err.message || 'Не удалось разбить задачу');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleToggleItem = async (itemId) => {
-    const item = checklist.find((i) => i.id === itemId)
-    if (!item) return
+    const item = checklist.find((i) => i.id === itemId);
+    if (!item) return;
 
     try {
       const updated = await api.patch(`/tasks/${task.id}/checklist/${itemId}`, {
         is_done: !item.is_done,
-      })
-      setChecklist(checklist.map((i) => (i.id === itemId ? updated : i)))
+      });
+      setChecklist(checklist.map((i) => (i.id === itemId ? updated : i)));
     } catch (err) {
-      setError(err.message || 'Не удалось обновить пункт')
+      setError(err.message || 'Не удалось обновить пункт');
     }
-  }
+  };
 
   const handleAddItem = async () => {
-    const trimmed = newItemText.trim()
-    if (!trimmed) return
+    const trimmed = newItemText.trim();
+    if (!trimmed) return;
 
     try {
-      setAddingItem(true)
-      setError(null)
-      const maxPosition = Math.max(0, ...checklist.map((i) => i.position))
+      setAddingItem(true);
+      setError(null);
+      const maxPosition = Math.max(0, ...checklist.map((i) => i.position));
       const created = await api.post(`/tasks/${task.id}/checklist`, {
         text: trimmed,
         position: maxPosition + 1,
-      })
-      setChecklist([...checklist, created])
-      setNewItemText('')
+      });
+      setChecklist([...checklist, created]);
+      setNewItemText('');
     } catch (err) {
-      setError(err.message || 'Не удалось добавить пункт')
+      setError(err.message || 'Не удалось добавить пункт');
     } finally {
-      setAddingItem(false)
+      setAddingItem(false);
     }
-  }
+  };
 
   const handleDeleteItem = async (itemId) => {
     try {
-      await api.delete(`/tasks/${task.id}/checklist/${itemId}`)
-      setChecklist(checklist.filter((i) => i.id !== itemId))
+      await api.delete(`/tasks/${task.id}/checklist/${itemId}`);
+      setChecklist(checklist.filter((i) => i.id !== itemId));
     } catch (err) {
-      setError(err.message || 'Не удалось удалить пункт')
+      setError(err.message || 'Не удалось удалить пункт');
     }
-  }
+  };
 
   const handleClose = () => {
-    setChecklist([])
-    setSuggestions([])
-    setDecomposed(false)
-    setNewItemText('')
-    setError(null)
-    onClose()
-  }
+    setChecklist([]);
+    setSuggestions([]);
+    setDecomposed(false);
+    setNewItemText('');
+    setError(null);
+    onClose();
+  };
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
@@ -180,41 +181,47 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
                 {checklist.length})
               </Typography>
             </Box>
-            <List>
-              {checklist.map((item) => (
-                <ListItem
-                  key={item.id}
-                  disablePadding
-                  secondaryAction={
-                    <IconButton
-                      edge="end"
-                      aria-label="delete"
-                      onClick={() => handleDeleteItem(item.id)}
-                      size="small"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  }
-                >
-                  <ListItemIcon>
-                    <Checkbox
-                      edge="start"
-                      checked={item.is_done}
-                      onChange={() => handleToggleItem(item.id)}
-                      tabIndex={-1}
-                      disableRipple
+            {checklist.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Пока нет шагов. Добавьте шаг вручную или разбейте задачу заново.
+              </Typography>
+            ) : (
+              <List>
+                {checklist.map((item) => (
+                  <ListItem
+                    key={item.id}
+                    disablePadding
+                    secondaryAction={
+                      <IconButton
+                        edge="end"
+                        aria-label="delete"
+                        onClick={() => handleDeleteItem(item.id)}
+                        size="small"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemIcon>
+                      <Checkbox
+                        edge="start"
+                        checked={item.is_done}
+                        onChange={() => handleToggleItem(item.id)}
+                        tabIndex={-1}
+                        disableRipple
+                      />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.text}
+                      sx={{
+                        textDecoration: item.is_done ? 'line-through' : 'none',
+                        color: item.is_done ? 'text.disabled' : 'text.primary',
+                      }}
                     />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={item.text}
-                    sx={{
-                      textDecoration: item.is_done ? 'line-through' : 'none',
-                      color: item.is_done ? 'text.disabled' : 'text.primary',
-                    }}
-                  />
-                </ListItem>
-              ))}
-            </List>
+                  </ListItem>
+                ))}
+              </List>
+            )}
 
             <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
               <TextField
@@ -225,7 +232,7 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
                 onChange={(e) => setNewItemText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    handleAddItem()
+                    handleAddItem();
                   }
                 }}
                 disabled={addingItem}
@@ -275,5 +282,5 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
         </Button>
       </DialogActions>
     </Dialog>
-  )
+  );
 }

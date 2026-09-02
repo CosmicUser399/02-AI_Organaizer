@@ -3,10 +3,12 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.database import Base, engine, ensure_schema
+from app.exceptions import OpenAIServiceError
 from app.routers import insights, notes, schedule, tasks
 
 # Configure logging
@@ -48,6 +50,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(OpenAIServiceError)
+async def openai_service_error_handler(
+    _request: Request,
+    exc: OpenAIServiceError,
+) -> JSONResponse:
+    """Return a user-facing error when an OpenAI call fails."""
+    logger.error("OpenAI service error: %s", str(exc))
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc)},
+    )
+
 
 # Include routers
 app.include_router(tasks.router, prefix="/api")

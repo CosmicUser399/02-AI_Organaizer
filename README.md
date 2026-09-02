@@ -1,384 +1,261 @@
 # AI-Органайзер
 
-Умный планировщик задач с искусственным интеллектом, который помогает управлять делами, заметками и временем.
+Локальный однопользовательский планировщик задач с искусственным
+интеллектом: умный ввод, чек-листы, заметки, приоритеты на день и
+вечерний дайджест.
 
 ## Возможности
 
-- **Magic Input**: естественный язык для создания задач с автоматическим парсингом дат и приоритетов
-- **AI-декомпозиция**: автоматическая разбивка сложных задач на конкретные шаги с возможностью добавления и редактирования подзадач
-- **Умные заметки**: автоматическая генерация тегов и поиск связанных задач
-- **Семантический поиск**: поиск по заметкам на основе смысла вопроса с AI-ответами
-- **Быстрое форматирование**: мгновенное преобразование выделенного текста (краткое резюме, исправление грамматики, смена тона)
-- **Адаптивный планировщик**: матрица Эйзенхауэра, фокус дня и умный перенос просроченных задач
-- **Вечерний дайджест**: AI-анализ продуктивности с учётом прогресса по подзадачам и планирование завтрашнего дня
+- **Magic Input** — задача из свободной фразы; ИИ извлекает заголовок,
+  дату, тег и приоритет. Если разбор не удался, задача всё равно
+  создаётся как есть.
+- **AI-декомпозиция** — кнопка «Разбить на шаги» строит чек-лист и
+  подсказки; шаги можно добавлять, править и удалять.
+- **Умные заметки** — автотеги и предложение связи с существующими
+  задачами.
+- **Семантический поиск** — «Спроси свои заметки»: поиск по смыслу и
+  краткий AI-ответ по найденным фрагментам.
+- **Быстрое форматирование** — выделение текста в заметке: краткое
+  резюме, грамматика, деловой или дружелюбный тон.
+- **Адаптивный планировщик** — матрица Эйзенхауэра, фокус дня и
+  предложение нового окна для просроченных задач.
+- **Вечерний дайджест** — отчёт о продуктивности с учётом прогресса по
+  подзадачам; кэш на календарный день (`?refresh=true` пересобирает).
+
+История последних строк Magic Input хранится в `localStorage`.
+Задачи, чек-листы и заметки живут в SQLite, не в браузере.
 
 ## Стек технологий
 
 ### Backend
-- Python 3.11+
-- FastAPI (веб-фреймворк)
-- SQLAlchemy + SQLite (база данных)
-- OpenAI API (Chat + Embeddings)
-- Pydantic (валидация данных)
 
-Для совместимости OpenAI SDK используется фиксированная пара
-`openai==1.47.0` и `httpx==0.27.2`. Не обновляйте эти зависимости
-по отдельности без проверки запуска backend.
+- Python 3.11+
+- FastAPI, uvicorn
+- SQLAlchemy + SQLite
+- Pydantic / pydantic-settings
+- OpenAI API (Chat + Embeddings)
+- ruff, black, isort (`line-length = 79`)
+
+Для совместимости OpenAI SDK зафиксирована пара
+`openai==1.47.0` и `httpx==0.27.2`. Не обновляйте их по отдельности
+без проверки запуска backend.
 
 ### Frontend
-- React 18
-- Vite (сборщик)
-- Material UI (компоненты)
-- Fetch API (работа с backend)
+
+- React 18, Vite
+- Material UI
+- ESLint + Prettier
+- все HTTP-запросы только через `src/api/client.js`
+
+## Переменные окружения
+
+Скопируйте `.env.example` в `.env` в корне проекта:
+
+| Переменная | Назначение | Пример |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Ключ OpenAI | `sk-...` |
+| `OPENAI_CHAT_MODEL` | Чат-модель | `gpt-4o-mini` |
+| `EMBEDDING_MODEL` | Эмбеддинги для поиска | `text-embedding-3-small` |
+| `API_BASE_URL` | URL API (справка / клиенты) | `http://localhost:18080` |
+
+Файл `.env` не коммитится. Без валидного ключа AI-функции вернут
+понятную ошибку (таймаут, сеть, лимит, неверный ключ).
 
 ## Установка и запуск
 
-### Вариант 1: Запуск через Docker (рекомендуется)
+### Вариант 1: Docker (рекомендуется)
 
-> 📘 Полная документация по Docker: [DOCKER.md](DOCKER.md)
-
-#### Предварительные требования
-
-- Docker и Docker Compose
-- OpenAI API ключ
-
-#### Настройка и запуск
-
-1. Создайте файл `.env` в корне проекта:
+Полная документация: [DOCKER.md](DOCKER.md).
 
 ```bash
-OPENAI_API_KEY=sk-your-openai-api-key-here
-OPENAI_CHAT_MODEL=gpt-4o-mini
-EMBEDDING_MODEL=text-embedding-3-small
-API_BASE_URL=http://localhost:18080
-```
-
-2. Запустите приложение:
-
-```bash
-# Development режим (с hot-reload)
+# Development (hot-reload)
 docker-compose up
 
-# Production режим
+# Production
 docker-compose -f docker-compose.prod.yml up -d
-
-# Остановка
-docker-compose down
-
-# Пересборка после изменений
-docker-compose up --build
 ```
 
-**Приложение будет доступно:**
+Доступ:
+
 - Frontend (dev): http://localhost:5173
 - Frontend (prod): http://localhost:80
 - Backend API: http://localhost:18080
-- API документация: http://localhost:18080/docs
+- OpenAPI: http://localhost:18080/docs
 
-В Docker development-режиме frontend использует Vite-прокси
-`/api -> http://backend:18080`. В браузере используются только
-относительные API-адреса `/api/...`; имя `backend` доступно только
-внутри Docker-сети. Для списка задач используйте завершающий `/`:
-`/api/tasks/`. Это предотвращает перенаправление HTTP 307 на
-недоступный браузеру внутренний адрес.
+В Docker frontend проксирует `/api` на `http://backend:18080`.
+В браузере используйте относительные адреса `/api/...`. Для списка
+задач нужен завершающий слэш: `/api/tasks/`.
 
----
+### Вариант 2: Локально, без Docker
 
-### Вариант 2: Локальный запуск (без Docker)
+Нужны Python 3.11+ и Node.js 18+.
 
-#### Предварительные требования
-
-- Python 3.11 или выше
-- Node.js 18 или выше
-- OpenAI API ключ
-
-#### 1. Настройка окружения
-
-Создайте файл `.env` в корне проекта (используйте `.env.example` как шаблон):
+**Backend:**
 
 ```bash
-OPENAI_API_KEY=sk-your-openai-api-key-here
-OPENAI_CHAT_MODEL=gpt-4o-mini
-EMBEDDING_MODEL=text-embedding-3-small
-API_BASE_URL=http://localhost:18080
-```
-
-#### 2. Запуск Backend
-
-```bash
-# Перейдите в директорию backend
 cd backend
-
-# Создайте виртуальное окружение
 python -m venv .venv
-
-# Активируйте виртуальное окружение
 # Windows:
 .venv\Scripts\activate
 # Linux/macOS:
 source .venv/bin/activate
-
-# Установите зависимости
 pip install -r requirements.txt
-
-# Запустите сервер
 python -m uvicorn app.main:app --reload --port 18080
 ```
 
-Backend будет доступен по адресу: http://localhost:18080
-
-Документация API (Swagger): http://localhost:18080/docs
-
-#### 3. Запуск Frontend
-
-Откройте новый терминал:
+**Frontend** (второй терминал):
 
 ```bash
-# Перейдите в директорию frontend
 cd frontend
-
-# Установите зависимости
 npm install
-
-# Запустите dev-сервер
 npm run dev
 ```
 
-Frontend будет доступен по адресу: http://localhost:5173
+- Dev: http://localhost:5173 (`npm run dev`)
+- Сборка: `npm run build`
+- Проверка сборки: `npm run preview`
 
-#### 4. Production сборка (локально)
-
-```bash
-# Backend: используйте production ASGI сервер
-uvicorn app.main:app --host 0.0.0.0 --port 18080
-
-# Frontend: соберите статику
-cd frontend
-npm run build
-npm run preview
-```
+Локальный Vite по умолчанию проксирует `/api` на Docker-имя
+`backend`. Если backend запущен на хосте, используйте Docker для
+обоих сервисов или поправьте `proxy.target` в `vite.config.js` на
+`http://localhost:18080`.
 
 ## Структура проекта
 
 ```
 02-AI_Organaizer/
-├── backend/              # Backend приложение
+├── backend/
 │   ├── app/
-│   │   ├── main.py       # FastAPI приложение
-│   │   ├── config.py     # Конфигурация
-│   │   ├── database.py   # База данных
-│   │   ├── models.py     # SQLAlchemy модели
-│   │   ├── schemas.py    # Pydantic схемы
-│   │   ├── routers/      # API endpoints
-│   │   └── services/     # Бизнес-логика и AI
+│   │   ├── main.py
+│   │   ├── exceptions.py
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── routers/
+│   │   └── services/
 │   ├── requirements.txt
 │   ├── pyproject.toml
-│   ├── Dockerfile
-│   └── .dockerignore
-├── frontend/             # Frontend приложение
+│   └── Dockerfile
+├── frontend/
 │   ├── src/
-│   │   ├── main.jsx      # Точка входа
-│   │   ├── App.jsx       # Главный компонент
-│   │   ├── theme.js      # MUI тема
-│   │   ├── api/          # API клиент
-│   │   └── components/   # React компоненты
+│   │   ├── api/client.js
+│   │   └── components/
 │   ├── vite.config.js
-│   ├── package.json
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── nginx.conf
-├── docker-compose.yml       # Docker Compose для dev
-├── docker-compose.prod.yml  # Docker Compose для prod
-├── .env                     # Секреты (не в git)
-├── .env.example             # Шаблон переменных
-├── .gitignore
-├── spec.md                  # Спецификация
-├── architecture.md          # Архитектура
-├── DOCKER.md                # Docker документация
+│   └── package.json
+├── docker-compose.yml
+├── docker-compose.prod.yml
+├── .env.example
+├── spec.md
+├── architecture.md
+├── DOCKER.md
 └── README.md
 ```
 
 ## Разработка
 
-### Code Style
+### Стиль кода
 
-**Python:**
-- Отступы: 4 пробела
-- Длина строки: ≤79 символов
-- Форматирование: `black`, `isort`, `ruff`
-- Type hints обязательны
-- Докстринги в формате PEP 257
+**Python:** 4 пробела, длина строки ≤79, type hints, PEP 257,
+`logging` вместо `print`.
 
-**JavaScript/React:**
-- Отступы: 2 пробела
-- ESLint + Prettier
-- Функциональные компоненты + хуки
-- Нет `console.log` в production коде
+**JavaScript/React:** функциональные компоненты и хуки, Prettier
+(2 пробела), без `console.log` в итоговом коде.
 
 ### Линтинг и форматирование
 
 ```bash
-# Backend
-cd backend
+# Backend (из backend/, с активированным venv)
 ruff check .
 black --check .
 isort --check-only .
+# автоисправление:
+ruff check --fix .
+black .
+isort .
 
-# Frontend
-cd frontend
+# Frontend (из frontend/)
 npm run lint
+npm run format:check
 npm run format
 ```
 
-### Docker команды
+## API
 
-```bash
-# Запуск в development режиме
-docker-compose up
+- `GET /health` — проверка работоспособности
+- `GET/POST /tasks/`, `PATCH/DELETE /tasks/{id}`
+- `DELETE /tasks/` — очистить список
+- `POST /tasks/parse` — Magic Input
+- `POST /tasks/{id}/decompose` — чек-лист через AI
+- `GET/POST /tasks/{id}/checklist`, `PATCH/DELETE .../checklist/{item_id}`
+- `POST /tasks/{id}/reschedule` — предложение нового времени
+- `GET/POST /notes/`, `PATCH/DELETE /notes/{id}`
+- `POST /notes/ask` — семантический поиск
+- `POST /notes/{id}/transform` — форматирование выделения
+- `GET /notes/{id}/suggested-tasks` — связанные задачи
+- `GET /schedule/today` — фокус дня и матрица Эйзенхауэра
+- `GET /insights/digest` — вечерний дайджест (`?date=`, `?refresh=true`)
 
-# Запуск в background
-docker-compose up -d
+Коллекционные URL: `/api/tasks/` и `/api/notes/` (завершающий `/`).
 
-# Остановка
-docker-compose down
-
-# Остановка с удалением volumes (БД)
-docker-compose down -v
-
-# Пересборка образов
-docker-compose build
-
-# Пересборка backend после изменения Python-зависимостей
-docker-compose build --no-cache backend
-docker-compose up -d backend
-
-# Просмотр логов
-docker-compose logs -f
-
-# Запуск production версии
-docker-compose -f docker-compose.prod.yml up -d
-
-# Выполнение команды в контейнере backend
-docker-compose exec backend python -m app.some_script
-
-# Выполнение команды в контейнере frontend
-docker-compose exec frontend npm run lint
-```
-
-## API Endpoints
-
-- `GET /` - информация о приложении
-- `GET /health` - проверка работоспособности
-- `POST /tasks` - создать задачу
-- `GET /tasks` - получить список задач
-- `PATCH /tasks/{id}` - обновить задачу
-- `DELETE /tasks/{id}` - удалить задачу
-- `POST /tasks/parse` - создать задачу через Magic Input
-- `POST /tasks/{id}/decompose` - сгенерировать чек-лист через AI
-- `GET /tasks/{id}/checklist` - получить все подзадачи
-- `POST /tasks/{id}/checklist` - добавить новую подзадачу
-- `PATCH /tasks/{id}/checklist/{item_id}` - обновить подзадачу (статус, текст)
-- `DELETE /tasks/{id}/checklist/{item_id}` - удалить подзадачу
-- `POST /tasks/{id}/reschedule` - предложить новое время для просроченной задачи
-- `GET/POST/PATCH/DELETE /notes` - CRUD заметок с AI-автотегами
-- `POST /notes/ask` - семантический поиск «Спроси свои заметки»
-- `POST /notes/{id}/transform` - быстрое форматирование (summary / грамматика / смена тона)
-- `GET /notes/{id}/suggested-tasks` - предложить связанные задачи
-- `GET /schedule/today` - фокус дня и матрица Эйзенхауэра
-- `GET /insights/digest` - вечерний AI-дайджест с учётом прогресса по подзадачам (`?date=`, `?refresh=true`)
-
-Коллекционные URL должны использовать завершающий `/`, например
-`/api/tasks/` и `/api/notes/`, чтобы избежать HTTP 307 через Docker-прокси.
+Вызовы OpenAI на backend ограничены таймаутом ~40 с (одна повторная
+попытка). Frontend ждёт до 90 с и показывает ошибку сети, таймаута
+или OpenAI без сырого стека. На экранах загрузки есть лоадеры, пустые
+списки и кнопка «Повторить».
 
 ## Устранение типовых проблем
 
-### Backend возвращает HTTP 500 или не запускается
-
-Проверьте логи:
+### Backend: HTTP 500 или не стартует
 
 ```bash
 docker-compose logs --since 5m backend
 ```
 
-Если встречается `unexpected keyword argument 'proxies'`,
-пересоберите backend без кэша:
+Если в логах `unexpected keyword argument 'proxies'`:
 
 ```bash
 docker-compose build --no-cache backend
 docker-compose up -d backend
 ```
 
-В `backend/requirements.txt` версии `openai` и `httpx` зафиксированы
-совместимой парой. Не обновляйте их по отдельности без проверки SDK.
+### Frontend: ERR_CONNECTION_RESET или пустой экран
 
-### `validateDOMNesting` в консоли браузера
+Проверьте HMR в `frontend/vite.config.js`: `hmr.clientPort: 5173`,
+`hmr.host: 'localhost'`, `watch.usePolling: true`. Затем:
 
-`ListItemText.secondary` в MUI по умолчанию рендерится как `<p>`.
-Не помещайте внутрь него `Box`, `Chip` или другие блочные элементы.
-Размещайте теги и подобный контент в отдельном соседнем контейнере.
+```bash
+docker-compose build --no-cache frontend
+docker-compose up -d frontend
+```
+
+### `validateDOMNesting` в консоли
+
+Не кладите `Box`/`Chip` в `ListItemText.secondary` — MUI оборачивает
+его в `<p>`.
 
 ## База данных
 
-SQLite база данных создается автоматически при первом запуске backend.
+SQLite создаётся при старте backend: `backend/data/ai_organizer.db`
+(в Docker эта папка — volume).
 
-Модели:
-- `Task` - задачи
-- `ChecklistItem` - пункты чек-листов
-- `Note` - заметки
-- `NoteChunk` - фрагменты заметок с embeddings
+Модели: `Task`, `ChecklistItem`, `Note`, `NoteChunk`.
 
 ### Резервное копирование
 
-Для защиты данных используйте скрипт автоматического резервного копирования:
-
-**Windows:**
 ```bash
+# Windows
 backup_db.bat
-```
 
-**Linux/macOS:**
-```bash
+# Linux/macOS
 chmod +x backup_db.sh
 ./backup_db.sh
-```
 
-**Или напрямую через Python:**
-```bash
+# или
 python backup_db.py
 ```
 
-Скрипт автоматически:
-- Создаёт копию `backend/data/ai_organizer.db` с временной меткой
-- Сохраняет резервные копии в папку `backups/`
-- Хранит последние 10 резервных копий
-- Удаляет копии старше 30 дней
-
-**Настройка автоматического резервного копирования:**
-
-Windows (Task Scheduler):
-```powershell
-# Создать задачу, запускающую backup_db.bat ежедневно
-schtasks /create /tn "AI-Organizer Backup" /tr "C:\path\to\backup_db.bat" /sc daily /st 23:00
-```
-
-Linux/macOS (cron):
-```bash
-# Добавить в crontab (запуск каждый день в 23:00)
-0 23 * * * /path/to/backup_db.sh
-```
-
-## Docker файлы
-
-Проект включает полную поддержку Docker для удобного развёртывания:
-
-- `backend/Dockerfile` - образ для Python/FastAPI приложения
-- `frontend/Dockerfile` - multi-stage образ (development + production с nginx)
-- `docker-compose.yml` - оркестрация для development с hot-reload
-- `docker-compose.prod.yml` - оркестрация для production
-- `frontend/nginx.conf` - конфигурация nginx для production
-- `DOCKER.md` - подробная документация по использованию Docker
-
-Подробные инструкции см. в [DOCKER.md](DOCKER.md).
+Скрипт копирует БД в `backups/`, хранит последние 10 копий и удаляет
+файлы старше 30 дней.
 
 ## Лицензия
 
@@ -386,4 +263,4 @@ Linux/macOS (cron):
 
 ## Автор
 
-AI-Органайзер - проект курса по разработке AI-приложений.
+AI-Органайзер — проект курса по разработке AI-приложений.

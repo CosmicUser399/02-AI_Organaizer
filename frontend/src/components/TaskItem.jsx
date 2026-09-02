@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState } from 'react';
 import {
   ListItem,
   ListItemButton,
@@ -9,31 +9,31 @@ import {
   Chip,
   Box,
   Tooltip,
-} from '@mui/material'
-import DeleteIcon from '@mui/icons-material/Delete'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
-import ChecklistDialog from './ChecklistDialog'
+} from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ChecklistDialog from './ChecklistDialog';
 
 export default function TaskItem({ task, onToggle, onDelete, api }) {
-  const [checklistOpen, setChecklistOpen] = useState(false)
+  const [checklistOpen, setChecklistOpen] = useState(false);
 
   const handleToggle = () => {
-    onToggle(task.id)
-  }
+    onToggle(task.id);
+  };
 
   const handleDelete = (e) => {
-    e.stopPropagation()
-    onDelete(task.id)
-  }
+    e.stopPropagation();
+    onDelete(task.id);
+  };
 
   const handleOpenChecklist = (e) => {
-    e.stopPropagation()
-    setChecklistOpen(true)
-  }
+    e.stopPropagation();
+    setChecklistOpen(true);
+  };
 
-  const isDone = task.status === 'done'
+  const isDone = task.status === 'done';
   const isOverdue =
-    Boolean(task.due_at) && !isDone && new Date(task.due_at) < new Date()
+    Boolean(task.due_at) && !isDone && new Date(task.due_at) < new Date();
 
   return (
     <>
@@ -105,5 +105,5 @@ export default function TaskItem({ task, onToggle, onDelete, api }) {
         api={api}
       />
     </>
-  )
+  );
 }

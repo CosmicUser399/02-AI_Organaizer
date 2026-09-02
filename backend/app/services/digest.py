@@ -81,9 +81,7 @@ def collect_day_stats(db: Session, target: date) -> dict:
 
     for task in all_tasks:
         if task.status == "done":
-            done_at = as_naive(task.completed_at) or as_naive(
-                task.updated_at
-            )
+            done_at = as_naive(task.completed_at) or as_naive(task.updated_at)
             if done_at is not None and start <= done_at < end:
                 completed_today.append(task)
                 completed_weight += 1.0
@@ -177,8 +175,7 @@ def _generate_digest_text(stats: dict) -> str:
     in_progress_lines = []
     for item in in_progress:
         in_progress_lines.append(
-            f"  - {item['title']}: {item['progress']} "
-            f"({item['percent']}%)"
+            f"  - {item['title']}: {item['progress']} " f"({item['percent']}%)"
         )
     in_progress_str = (
         "\n".join(in_progress_lines) if in_progress_lines else "нет"

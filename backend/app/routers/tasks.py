@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
+from app.exceptions import raise_openai_http
 from app.services.capture import parse_magic_input
 from app.services.decompose import decompose_task
 from app.services.scheduler import propose_reschedule
@@ -226,9 +227,9 @@ def parse_and_create_task(
         parsed = parse_magic_input(request.raw_input)
     except Exception as e:
         logger.error("Failed to parse magic input: %s", str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to parse input: {str(e)}",
+        raise_openai_http(
+            e,
+            fallback="Не удалось разобрать запрос. Попробуйте ещё раз.",
         )
 
     # Create task with parsed data
@@ -295,9 +296,9 @@ def decompose_task_endpoint(
         )
     except Exception as e:
         logger.error("Failed to decompose task: %s", str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to decompose task: {str(e)}",
+        raise_openai_http(
+            e,
+            fallback="Не удалось разбить задачу на шаги.",
         )
 
     # Create checklist items
@@ -559,10 +560,10 @@ def reschedule_task(
         ) from exc
     except Exception as exc:
         logger.error("Reschedule failed: %s", str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Не удалось предложить новое время",
-        ) from exc
+        raise_openai_http(
+            exc,
+            fallback="Не удалось предложить новое время.",
+        )
 
     return schemas.RescheduleResponse(
         task_id=db_task.id,
