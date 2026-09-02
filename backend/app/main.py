@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import engine, Base
-from app.routers import tasks, notes
+from app.database import Base, engine, ensure_schema
+from app.routers import insights, notes, schedule, tasks
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     # Startup: Create database tables
     logger.info("Creating database tables...")
     Base.metadata.create_all(bind=engine)
+    ensure_schema()
     logger.info("Application startup complete")
     yield
     # Shutdown
@@ -51,6 +52,8 @@ app.add_middleware(
 # Include routers
 app.include_router(tasks.router, prefix="/api")
 app.include_router(notes.router, prefix="/api")
+app.include_router(schedule.router, prefix="/api")
+app.include_router(insights.router, prefix="/api")
 
 
 @app.get("/")

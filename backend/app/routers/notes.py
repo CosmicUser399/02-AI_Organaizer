@@ -1,14 +1,19 @@
 """Notes router with CRUD and AI operations."""
 
 import logging
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
-from app.services.notes_ai import analyze_note, suggest_task_link
+from app.services.embeddings import index_note, search_notes
+from app.services.notes_ai import (
+    analyze_note,
+    suggest_task_link,
+    transform_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +42,46 @@ def get_notes(
     return notes
 
 
+@router.post("/ask", response_model=schemas.NotesAskResponse)
+def ask_notes(
+    request: schemas.NotesAskRequest,
+    db: Session = Depends(get_db),
+) -> schemas.NotesAskResponse:
+    """Search notes by meaning and return matching fragments.
+
+    Args:
+        request: Question and optional result limit
+        db: Database session
+
+    Returns:
+        Generated answer plus ranked fragments
+
+    Raises:
+        HTTPException: If OpenAI embeddings/search fail
+    """
+    logger.info("Semantic search: %s", request.question[:80])
+    try:
+        matches, answer = search_notes(
+            db,
+            request.question,
+            top_k=request.top_k,
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error("Semantic search failed: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Не удалось выполнить поиск по заметкам",
+        ) from exc
+
+    return schemas.NotesAskResponse(
+        question=request.question,
+        answer=answer,
+        matches=[schemas.NotesAskMatch(**item) for item in matches],
+    )
+
+
 @router.get("/{note_id}", response_model=schemas.NoteResponse)
 def get_note(
     note_id: int,
@@ -56,9 +101,7 @@ def get_note(
         HTTPException: If note not found
     """
     logger.info("Fetching note with id=%d", note_id)
-    note = db.query(models.Note).filter(
-        models.Note.id == note_id
-    ).first()
+    note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if note is None:
         logger.warning("Note with id=%d not found", note_id)
         raise HTTPException(
@@ -98,10 +141,7 @@ def create_note(
         try:
             analysis = analyze_note(note.title, note.content)
             note_data["tags"] = analysis.tags
-            logger.info(
-                "Auto-generated %d tags for note",
-                len(analysis.tags)
-            )
+            logger.info("Auto-generated %d tags for note", len(analysis.tags))
         except Exception as e:
             logger.warning("Failed to auto-tag note: %s", str(e))
 
@@ -109,6 +149,18 @@ def create_note(
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
+
+    try:
+        index_note(db, db_note)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning(
+            "Failed to index new note id=%d: %s",
+            db_note.id,
+            str(exc),
+        )
+        db.refresh(db_note)
 
     logger.info("Note created successfully with id=%d", db_note.id)
     return db_note
@@ -139,9 +191,7 @@ def update_note(
     """
     logger.info("Updating note with id=%d", note_id)
 
-    db_note = db.query(models.Note).filter(
-        models.Note.id == note_id
-    ).first()
+    db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if db_note is None:
         logger.warning("Note with id=%d not found", note_id)
         raise HTTPException(
@@ -160,10 +210,7 @@ def update_note(
             new_content = update_data.get("content", db_note.content)
             analysis = analyze_note(new_title, new_content)
             update_data["tags"] = analysis.tags
-            logger.info(
-                "Re-generated %d tags for note",
-                len(analysis.tags)
-            )
+            logger.info("Re-generated %d tags for note", len(analysis.tags))
         except Exception as e:
             logger.warning("Failed to auto-tag note: %s", str(e))
 
@@ -172,6 +219,19 @@ def update_note(
 
     db.commit()
     db.refresh(db_note)
+
+    if content_changed:
+        try:
+            index_note(db, db_note)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "Failed to reindex note id=%d: %s",
+                note_id,
+                str(exc),
+            )
+            db.refresh(db_note)
 
     logger.info("Note with id=%d updated successfully", note_id)
     return db_note
@@ -194,9 +254,7 @@ def delete_note(
     """
     logger.info("Deleting note with id=%d", note_id)
 
-    db_note = db.query(models.Note).filter(
-        models.Note.id == note_id
-    ).first()
+    db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if db_note is None:
         logger.warning("Note with id=%d not found", note_id)
         raise HTTPException(
@@ -232,9 +290,7 @@ def get_suggested_task_links(
     """
     logger.info("Finding suggested tasks for note id=%d", note_id)
 
-    db_note = db.query(models.Note).filter(
-        models.Note.id == note_id
-    ).first()
+    db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if db_note is None:
         logger.warning("Note with id=%d not found", note_id)
         raise HTTPException(
@@ -242,9 +298,7 @@ def get_suggested_task_links(
             detail=f"Note with id {note_id} not found",
         )
 
-    tasks = db.query(models.Task).filter(
-        models.Task.status != "done"
-    ).all()
+    tasks = db.query(models.Task).filter(models.Task.status != "done").all()
 
     suggestions = []
     for task in tasks:
@@ -256,17 +310,71 @@ def get_suggested_task_links(
         )
 
         if relevance > 0.2:
-            suggestions.append({
-                "task_id": task.id,
-                "task_title": task.title,
-                "relevance": round(relevance, 2),
-            })
+            suggestions.append(
+                {
+                    "task_id": task.id,
+                    "task_title": task.title,
+                    "relevance": round(relevance, 2),
+                }
+            )
 
     suggestions.sort(key=lambda x: x["relevance"], reverse=True)
     suggestions = suggestions[:5]
 
-    logger.info(
-        "Found %d suggested tasks for note",
-        len(suggestions)
-    )
+    logger.info("Found %d suggested tasks for note", len(suggestions))
     return suggestions
+
+
+@router.post(
+    "/{note_id}/transform",
+    response_model=schemas.NoteTransformResponse,
+)
+def transform_note_selection(
+    note_id: int,
+    request: schemas.NoteTransformRequest,
+    db: Session = Depends(get_db),
+) -> schemas.NoteTransformResponse:
+    """Rewrite selected note text (summary, grammar, or tone).
+
+    Args:
+        note_id: Note ID (must exist)
+        request: Selected fragment and transform mode
+        db: Database session
+
+    Returns:
+        Transformed text; the note is not saved automatically
+
+    Raises:
+        HTTPException: If note is missing or OpenAI fails
+    """
+    logger.info(
+        "Transforming selection for note id=%d mode=%s",
+        note_id,
+        request.mode,
+    )
+    db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
+    if db_note is None:
+        logger.warning("Note with id=%d not found", note_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Note with id {note_id} not found",
+        )
+
+    try:
+        result = transform_text(request.selection, request.mode)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error("Note transform failed: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Не удалось преобразовать текст",
+        ) from exc
+
+    return schemas.NoteTransformResponse(
+        result=result,
+        mode=request.mode,
+    )

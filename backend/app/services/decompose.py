@@ -14,15 +14,14 @@ class DecomposedTask(BaseModel):
     """Structured output for task decomposition."""
 
     checklist_items: list[str] = Field(
-        ...,
-        description="List of actionable steps to complete the task"
+        ..., description="List of actionable steps to complete the task"
     )
     suggestions: list[str] = Field(
         default_factory=list,
         description=(
             "Contextual suggestions: potential blockers, "
             "additional subtasks, or things to consider"
-        )
+        ),
     )
 
 

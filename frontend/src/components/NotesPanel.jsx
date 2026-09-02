@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Paper,
   Box,
@@ -16,6 +16,7 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import NoteEditor from './NoteEditor'
+import AskNotesBar from './AskNotesBar'
 
 export default function NotesPanel({ api }) {
   const [notes, setNotes] = useState([])
@@ -24,11 +25,7 @@ export default function NotesPanel({ api }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    loadNotes()
-  }, [])
-
-  const loadNotes = async () => {
+  const loadNotes = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -39,7 +36,11 @@ export default function NotesPanel({ api }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
+
+  useEffect(() => {
+    loadNotes()
+  }, [loadNotes])
 
   const handleCreateNote = () => {
     setSelectedNote(null)
@@ -83,6 +84,8 @@ export default function NotesPanel({ api }) {
 
   return (
     <Box>
+      <AskNotesBar api={api} />
+
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h5" component="h2">
           Заметки

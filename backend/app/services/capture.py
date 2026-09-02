@@ -13,32 +13,25 @@ logger = logging.getLogger(__name__)
 class ParsedTask(BaseModel):
     """Structured output from Magic Input parsing."""
 
-    title: str = Field(
-        ...,
-        description="Short task title (max 100 chars)"
-    )
+    title: str = Field(..., description="Short task title (max 100 chars)")
     description: str | None = Field(
-        None,
-        description="Detailed task description or context"
+        None, description="Detailed task description or context"
     )
     due_at: datetime | None = Field(
-        None,
-        description="Due date/time in ISO format if mentioned"
+        None, description="Due date/time in ISO format if mentioned"
     )
     tag: str | None = Field(
         None,
         description=(
             "Category tag: work, personal, health, learning, "
             "finance, shopping, other"
-        )
+        ),
     )
     is_urgent: bool = Field(
-        False,
-        description="True if requires immediate attention"
+        False, description="True if requires immediate attention"
     )
     is_important: bool = Field(
-        False,
-        description="True if has significant impact/consequences"
+        False, description="True if has significant impact/consequences"
     )
 
 
@@ -87,8 +80,7 @@ Current datetime: {now}
             temperature=0.3,
         )
         logger.info(
-            "Magic input parsed successfully: title='%s'",
-            parsed.title
+            "Magic input parsed successfully: title='%s'", parsed.title
         )
         return parsed
     except Exception as e:

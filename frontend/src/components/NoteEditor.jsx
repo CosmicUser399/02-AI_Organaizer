@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -20,6 +20,13 @@ import {
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import LinkIcon from '@mui/icons-material/Link'
 
+const TRANSFORM_ACTIONS = [
+  { mode: 'summarize', label: 'Кратко' },
+  { mode: 'fix_grammar', label: 'Грамматика' },
+  { mode: 'tone_business', label: 'Деловой тон' },
+  { mode: 'tone_friendly', label: 'Дружелюбный' },
+]
+
 export default function NoteEditor({ open, note, onClose, onSave, api }) {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -29,6 +36,24 @@ export default function NoteEditor({ open, note, onClose, onSave, api }) {
   const [suggestedTasks, setSuggestedTasks] = useState([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [error, setError] = useState(null)
+  const [selection, setSelection] = useState({ start: 0, end: 0, text: '' })
+  const [transforming, setTransforming] = useState(false)
+  const contentRef = useRef(null)
+
+  const loadSuggestedTasks = useCallback(
+    async (noteId) => {
+      try {
+        setLoadingSuggestions(true)
+        const suggestions = await api.get(`/notes/${noteId}/suggested-tasks`)
+        setSuggestedTasks(suggestions)
+      } catch {
+        setSuggestedTasks([])
+      } finally {
+        setLoadingSuggestions(false)
+      }
+    },
+    [api]
+  )
 
   useEffect(() => {
     if (note) {
@@ -46,18 +71,46 @@ export default function NoteEditor({ open, note, onClose, onSave, api }) {
       setLinkedTaskId(null)
       setSuggestedTasks([])
     }
+    setSelection({ start: 0, end: 0, text: '' })
     setError(null)
-  }, [note, open])
+  }, [note, open, loadSuggestedTasks])
 
-  const loadSuggestedTasks = async (noteId) => {
+  const captureSelection = () => {
+    const field = contentRef.current
+    if (!field) return
+    const start = field.selectionStart
+    const end = field.selectionEnd
+    if (start === end) {
+      setSelection({ start, end, text: '' })
+      return
+    }
+    setSelection({
+      start,
+      end,
+      text: content.slice(start, end),
+    })
+  }
+
+  const handleTransform = async (mode) => {
+    if (!note?.id || !selection.text.trim()) {
+      setError('Сначала сохраните заметку и выделите фрагмент текста')
+      return
+    }
+
     try {
-      setLoadingSuggestions(true)
-      const suggestions = await api.get(`/notes/${noteId}/suggested-tasks`)
-      setSuggestedTasks(suggestions)
+      setTransforming(true)
+      setError(null)
+      const result = await api.post(`/notes/${note.id}/transform`, {
+        selection: selection.text,
+        mode,
+      })
+      const next = `${content.slice(0, selection.start)}${result.result}${content.slice(selection.end)}`
+      setContent(next)
+      setSelection({ start: 0, end: 0, text: '' })
     } catch (err) {
-      console.error('Failed to load suggestions:', err)
+      setError(err.message || 'Не удалось преобразовать текст')
     } finally {
-      setLoadingSuggestions(false)
+      setTransforming(false)
     }
   }
 
@@ -121,11 +174,49 @@ export default function NoteEditor({ open, note, onClose, onSave, api }) {
             label="Содержимое"
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            onSelect={captureSelection}
+            onKeyUp={captureSelection}
+            onMouseUp={captureSelection}
+            inputRef={contentRef}
             margin="normal"
             multiline
             rows={8}
             required
+            helperText={
+              note?.id
+                ? 'Выделите фрагмент, чтобы быстро переписать его с помощью AI'
+                : 'Сохраните заметку, чтобы включить быстрое форматирование'
+            }
           />
+
+          {note?.id && selection.text.trim() && (
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 1,
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                mb: 1,
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Форматировать выделение:
+              </Typography>
+              {TRANSFORM_ACTIONS.map((action) => (
+                <Button
+                  key={action.mode}
+                  size="small"
+                  variant="outlined"
+                  disabled={transforming}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleTransform(action.mode)}
+                >
+                  {action.label}
+                </Button>
+              ))}
+              {transforming && <CircularProgress size={18} />}
+            </Box>
+          )}
 
           <Box sx={{ mt: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -157,7 +248,9 @@ export default function NoteEditor({ open, note, onClose, onSave, api }) {
 
           {note && suggestedTasks.length > 0 && (
             <Box sx={{ mt: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
+              >
                 <LinkIcon fontSize="small" color="secondary" />
                 <Typography variant="subtitle2">
                   Предложенные связи с задачами
@@ -166,7 +259,10 @@ export default function NoteEditor({ open, note, onClose, onSave, api }) {
               {loadingSuggestions ? (
                 <CircularProgress size={24} />
               ) : (
-                <Paper variant="outlined" sx={{ maxHeight: 200, overflow: 'auto' }}>
+                <Paper
+                  variant="outlined"
+                  sx={{ maxHeight: 200, overflow: 'auto' }}
+                >
                   <List dense>
                     {suggestedTasks.map((task) => (
                       <ListItem key={task.task_id} disablePadding>

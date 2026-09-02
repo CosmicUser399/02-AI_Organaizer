@@ -1,9 +1,9 @@
 """SQLAlchemy database models."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -11,7 +11,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    JSON,
 )
 from sqlalchemy.orm import relationship
 
@@ -31,9 +30,8 @@ class Task(Base):
     tag = Column(String(50), nullable=True)
     is_urgent = Column(Boolean, default=False)
     is_important = Column(Boolean, default=False)
-    status = Column(
-        String(20), default="pending"
-    )  # pending/in_progress/done
+    status = Column(String(20), default="pending")  # pending/in_progress/done
+    completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

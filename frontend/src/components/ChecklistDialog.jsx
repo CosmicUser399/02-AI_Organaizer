@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -15,9 +15,13 @@ import {
   Box,
   Typography,
   Chip,
+  TextField,
+  IconButton,
 } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
+import AddIcon from '@mui/icons-material/Add'
+import DeleteIcon from '@mui/icons-material/Delete'
 
 export default function ChecklistDialog({ open, onClose, task, api }) {
   const [checklist, setChecklist] = useState([])
@@ -25,6 +29,31 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [decomposed, setDecomposed] = useState(false)
+  const [newItemText, setNewItemText] = useState('')
+  const [addingItem, setAddingItem] = useState(false)
+
+  const loadExistingChecklist = useCallback(async () => {
+    if (!task?.id) return
+
+    try {
+      setLoading(true)
+      const items = await api.get(`/tasks/${task.id}/checklist`)
+      if (items && items.length > 0) {
+        setChecklist(items)
+        setDecomposed(true)
+      }
+    } catch {
+      setDecomposed(false)
+    } finally {
+      setLoading(false)
+    }
+  }, [api, task?.id])
+
+  useEffect(() => {
+    if (open && task?.id) {
+      loadExistingChecklist()
+    }
+  }, [open, task?.id, loadExistingChecklist])
 
   const handleDecompose = async () => {
     try {
@@ -46,13 +75,42 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
     if (!item) return
 
     try {
-      const updated = await api.patch(
-        `/tasks/${task.id}/checklist/${itemId}`,
-        { is_done: !item.is_done }
-      )
+      const updated = await api.patch(`/tasks/${task.id}/checklist/${itemId}`, {
+        is_done: !item.is_done,
+      })
       setChecklist(checklist.map((i) => (i.id === itemId ? updated : i)))
     } catch (err) {
       setError(err.message || 'Не удалось обновить пункт')
+    }
+  }
+
+  const handleAddItem = async () => {
+    const trimmed = newItemText.trim()
+    if (!trimmed) return
+
+    try {
+      setAddingItem(true)
+      setError(null)
+      const maxPosition = Math.max(0, ...checklist.map((i) => i.position))
+      const created = await api.post(`/tasks/${task.id}/checklist`, {
+        text: trimmed,
+        position: maxPosition + 1,
+      })
+      setChecklist([...checklist, created])
+      setNewItemText('')
+    } catch (err) {
+      setError(err.message || 'Не удалось добавить пункт')
+    } finally {
+      setAddingItem(false)
+    }
+  }
+
+  const handleDeleteItem = async (itemId) => {
+    try {
+      await api.delete(`/tasks/${task.id}/checklist/${itemId}`)
+      setChecklist(checklist.filter((i) => i.id !== itemId))
+    } catch (err) {
+      setError(err.message || 'Не удалось удалить пункт')
     }
   }
 
@@ -60,6 +118,7 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
     setChecklist([])
     setSuggestions([])
     setDecomposed(false)
+    setNewItemText('')
     setError(null)
     onClose()
   }
@@ -107,12 +166,36 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
 
         {decomposed && !loading && (
           <>
-            <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-              Шаги выполнения:
-            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mt: 2,
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle1">
+                Шаги выполнения ({checklist.filter((i) => i.is_done).length}/
+                {checklist.length})
+              </Typography>
+            </Box>
             <List>
               {checklist.map((item) => (
-                <ListItem key={item.id} disablePadding>
+                <ListItem
+                  key={item.id}
+                  disablePadding
+                  secondaryAction={
+                    <IconButton
+                      edge="end"
+                      aria-label="delete"
+                      onClick={() => handleDeleteItem(item.id)}
+                      size="small"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  }
+                >
                   <ListItemIcon>
                     <Checkbox
                       edge="start"
@@ -133,9 +216,37 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
               ))}
             </List>
 
+            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Добавить новый шаг..."
+                value={newItemText}
+                onChange={(e) => setNewItemText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddItem()
+                  }
+                }}
+                disabled={addingItem}
+              />
+              <Button
+                variant="outlined"
+                startIcon={
+                  addingItem ? <CircularProgress size={16} /> : <AddIcon />
+                }
+                onClick={handleAddItem}
+                disabled={!newItemText.trim() || addingItem}
+              >
+                Добавить
+              </Button>
+            </Box>
+
             {suggestions.length > 0 && (
               <Box sx={{ mt: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Box
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}
+                >
                   <LightbulbOutlinedIcon color="warning" fontSize="small" />
                   <Typography variant="subtitle2" color="text.secondary">
                     Подсказки:
@@ -158,7 +269,10 @@ export default function ChecklistDialog({ open, onClose, task, api }) {
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Закрыть</Button>
+        <Button onClick={handleClose}>Отмена</Button>
+        <Button onClick={handleClose} variant="contained">
+          Сохранить
+        </Button>
       </DialogActions>
     </Dialog>
   )

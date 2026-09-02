@@ -1,6 +1,7 @@
 """Tasks router with CRUD operations."""
 
 import logging
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,6 +12,7 @@ from app import models, schemas
 from app.database import get_db
 from app.services.capture import parse_magic_input
 from app.services.decompose import decompose_task
+from app.services.scheduler import propose_reschedule
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +36,7 @@ def get_tasks(
     Returns:
         List of tasks
     """
-    logger.info(
-        "Fetching tasks with skip=%d, limit=%d", skip, limit
-    )
+    logger.info("Fetching tasks with skip=%d, limit=%d", skip, limit)
     tasks = db.query(models.Task).offset(skip).limit(limit).all()
     return tasks
 
@@ -119,9 +119,7 @@ def update_task(
         HTTPException: If task not found
     """
     logger.info("Updating task with id=%d", task_id)
-    db_task = db.query(models.Task).filter(
-        models.Task.id == task_id
-    ).first()
+    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if db_task is None:
         logger.warning("Task with id=%d not found", task_id)
         raise HTTPException(
@@ -130,6 +128,13 @@ def update_task(
         )
 
     update_data = task_update.model_dump(exclude_unset=True)
+    if "status" in update_data:
+        new_status = update_data["status"]
+        if new_status == "done" and db_task.status != "done":
+            db_task.completed_at = datetime.utcnow()
+        elif new_status != "done":
+            db_task.completed_at = None
+
     for field, value in update_data.items():
         setattr(db_task, field, value)
 
@@ -155,9 +160,7 @@ def delete_task(
         HTTPException: If task not found
     """
     logger.info("Deleting task with id=%d", task_id)
-    db_task = db.query(models.Task).filter(
-        models.Task.id == task_id
-    ).first()
+    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if db_task is None:
         logger.warning("Task with id=%d not found", task_id)
         raise HTTPException(
@@ -276,9 +279,7 @@ def decompose_task_endpoint(
     logger.info("Decomposing task with id=%d", task_id)
 
     # Get task
-    db_task = db.query(models.Task).filter(
-        models.Task.id == task_id
-    ).first()
+    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if db_task is None:
         logger.warning("Task with id=%d not found", task_id)
         raise HTTPException(
@@ -315,8 +316,7 @@ def decompose_task_endpoint(
         db.refresh(item)
 
     logger.info(
-        "Task decomposed: created %d checklist items",
-        len(created_items)
+        "Task decomposed: created %d checklist items", len(created_items)
     )
 
     return {
@@ -349,9 +349,9 @@ def get_checklist(
     logger.info("Fetching checklist for task id=%d", task_id)
 
     # Check task exists
-    task_exists = db.query(models.Task).filter(
-        models.Task.id == task_id
-    ).first()
+    task_exists = (
+        db.query(models.Task).filter(models.Task.id == task_id).first()
+    )
     if task_exists is None:
         logger.warning("Task with id=%d not found", task_id)
         raise HTTPException(
@@ -366,6 +366,59 @@ def get_checklist(
         .all()
     )
     return items
+
+
+@router.post(
+    "/{task_id}/checklist",
+    response_model=schemas.ChecklistItemResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_checklist_item(
+    task_id: int,
+    item_create: schemas.ChecklistItemCreate,
+    db: Session = Depends(get_db),
+) -> models.ChecklistItem:
+    """
+    Add a new checklist item to a task.
+
+    Args:
+        task_id: Task ID
+        item_create: New checklist item data
+        db: Database session
+
+    Returns:
+        Created checklist item
+
+    Raises:
+        HTTPException: If task not found
+    """
+    logger.info("Adding checklist item to task id=%d", task_id)
+
+    task_exists = (
+        db.query(models.Task).filter(models.Task.id == task_id).first()
+    )
+    if task_exists is None:
+        logger.warning("Task with id=%d not found", task_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task with id {task_id} not found",
+        )
+
+    db_item = models.ChecklistItem(
+        task_id=task_id,
+        text=item_create.text,
+        position=item_create.position,
+    )
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+
+    logger.info(
+        "Checklist item %d added to task %d",
+        db_item.id,
+        task_id,
+    )
+    return db_item
 
 
 @router.patch(
@@ -393,10 +446,7 @@ def update_checklist_item(
     Raises:
         HTTPException: If task or item not found
     """
-    logger.info(
-        "Updating checklist item %d for task %d",
-        item_id, task_id
-    )
+    logger.info("Updating checklist item %d for task %d", item_id, task_id)
 
     db_item = (
         db.query(models.ChecklistItem)
@@ -445,10 +495,7 @@ def delete_checklist_item(
     Raises:
         HTTPException: If task or item not found
     """
-    logger.info(
-        "Deleting checklist item %d for task %d",
-        item_id, task_id
-    )
+    logger.info("Deleting checklist item %d for task %d", item_id, task_id)
 
     db_item = (
         db.query(models.ChecklistItem)
@@ -470,3 +517,57 @@ def delete_checklist_item(
     db.commit()
 
     logger.info("Checklist item %d deleted successfully", item_id)
+
+
+@router.post(
+    "/{task_id}/reschedule",
+    response_model=schemas.RescheduleResponse,
+)
+def reschedule_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+) -> schemas.RescheduleResponse:
+    """Suggest a new time window for an overdue task.
+
+    Does not apply the change; the client confirms via PATCH.
+
+    Args:
+        task_id: Task ID
+        db: Database session
+
+    Returns:
+        Proposed due time and explanation
+
+    Raises:
+        HTTPException: If task is missing, not overdue, or AI fails
+    """
+    logger.info("Rescheduling task id=%d", task_id)
+    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if db_task is None:
+        logger.warning("Task with id=%d not found", task_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task with id {task_id} not found",
+        )
+
+    try:
+        proposal = propose_reschedule(db, db_task)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error("Reschedule failed: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Не удалось предложить новое время",
+        ) from exc
+
+    return schemas.RescheduleResponse(
+        task_id=db_task.id,
+        current_due_at=db_task.due_at,
+        suggested_due_at=proposal.suggested_due_at,
+        reason=proposal.reason,
+        day_load_summary=proposal.day_load_summary,
+    )

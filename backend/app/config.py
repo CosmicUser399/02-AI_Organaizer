@@ -1,6 +1,5 @@
 """Application configuration using pydantic-settings."""
 
-import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -8,7 +7,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Project root directory (02-AI_Organaizer/)
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
-DB_FILE = PROJECT_ROOT / "ai_organizer.db"
+
+# Database directory and file
+# In Docker: /app/data/ai_organizer.db (mounted volume)
+# Locally: backend/data/ai_organizer.db
+DB_DIR = Path(__file__).parent.parent / "data"
+DB_DIR.mkdir(exist_ok=True)
+DB_FILE = DB_DIR / "ai_organizer.db"
 
 
 class Settings(BaseSettings):

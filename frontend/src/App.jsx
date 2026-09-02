@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ThemeProvider } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import Container from '@mui/material/Container'
@@ -13,6 +13,8 @@ import api from './api/client'
 import MagicInput from './components/MagicInput'
 import TaskList from './components/TaskList'
 import NotesPanel from './components/NotesPanel'
+import Planner from './components/Planner'
+import DigestCard from './components/DigestCard'
 
 function App() {
   const [tasks, setTasks] = useState([])
@@ -21,11 +23,7 @@ function App() {
   const [submitting, setSubmitting] = useState(false)
   const [currentTab, setCurrentTab] = useState(0)
 
-  useEffect(() => {
-    loadTasks()
-  }, [])
-
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -36,7 +34,13 @@ function App() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (currentTab === 0) {
+      loadTasks()
+    }
+  }, [currentTab, loadTasks])
 
   const handleAddTask = async (input) => {
     try {
@@ -126,6 +130,7 @@ function App() {
               onChange={(e, newValue) => setCurrentTab(newValue)}
             >
               <Tab label="Задачи" />
+              <Tab label="Планировщик" />
               <Tab label="Заметки" />
             </Tabs>
           </Box>
@@ -149,10 +154,14 @@ function App() {
                   api={api}
                 />
               )}
+
+              <DigestCard api={api} />
             </>
           )}
 
-          {currentTab === 1 && <NotesPanel api={api} />}
+          {currentTab === 1 && <Planner api={api} />}
+
+          {currentTab === 2 && <NotesPanel api={api} />}
         </Box>
       </Container>
     </ThemeProvider>

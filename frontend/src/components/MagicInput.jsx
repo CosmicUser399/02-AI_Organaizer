@@ -12,7 +12,6 @@ import {
   Collapse,
   CircularProgress,
 } from '@mui/material'
-import AddIcon from '@mui/icons-material/Add'
 import HistoryIcon from '@mui/icons-material/History'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 

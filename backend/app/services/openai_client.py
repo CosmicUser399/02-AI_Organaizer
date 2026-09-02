@@ -1,7 +1,6 @@
 """OpenAI client wrapper for structured API calls."""
 
 import logging
-from typing import Any
 
 from openai import OpenAI
 from pydantic import BaseModel
@@ -19,10 +18,7 @@ class OpenAIClient:
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.chat_model = settings.openai_chat_model
         self.embedding_model = settings.embedding_model
-        logger.info(
-            "OpenAI client initialized with model=%s",
-            self.chat_model
-        )
+        logger.info("OpenAI client initialized with model=%s", self.chat_model)
 
     def chat_completion(
         self,
@@ -86,7 +82,7 @@ class OpenAIClient:
 
         logger.info(
             "Requesting structured completion with format=%s",
-            response_format.__name__
+            response_format.__name__,
         )
         try:
             response = self.client.beta.chat.completions.parse(
@@ -102,6 +98,40 @@ class OpenAIClient:
             logger.error("OpenAI API error: %s", str(e))
             raise
 
+    def get_embeddings(self, texts: list[str]) -> list[list[float]]:
+        """
+        Get embedding vectors for one or more texts.
+
+        Args:
+            texts: Texts to embed
+
+        Returns:
+            Embedding vectors in the same order as texts
+        """
+        if not texts:
+            return []
+
+        logger.info("Requesting embeddings for %d texts", len(texts))
+        try:
+            vectors: list[list[float]] = []
+            batch_size = 64
+            for start in range(0, len(texts), batch_size):
+                batch = texts[start : start + batch_size]
+                response = self.client.embeddings.create(
+                    model=self.embedding_model,
+                    input=batch,
+                )
+                ordered = sorted(response.data, key=lambda item: item.index)
+                vectors.extend(item.embedding for item in ordered)
+            logger.info(
+                "Embeddings received successfully, count=%d",
+                len(vectors),
+            )
+            return vectors
+        except Exception as e:
+            logger.error("OpenAI API error: %s", str(e))
+            raise
+
     def get_embedding(self, text: str) -> list[float]:
         """
         Get embedding vector for text.
@@ -112,21 +142,8 @@ class OpenAIClient:
         Returns:
             Embedding vector (list of floats)
         """
-        logger.info("Requesting embedding for text")
-        try:
-            response = self.client.embeddings.create(
-                model=self.embedding_model,
-                input=text,
-            )
-            embedding = response.data[0].embedding
-            logger.info(
-                "Embedding received successfully, dimension=%d",
-                len(embedding)
-            )
-            return embedding
-        except Exception as e:
-            logger.error("OpenAI API error: %s", str(e))
-            raise
+        embeddings = self.get_embeddings([text])
+        return embeddings[0] if embeddings else []
 
 
 # Singleton instance

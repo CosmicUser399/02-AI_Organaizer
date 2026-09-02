@@ -32,6 +32,8 @@ export default function TaskItem({ task, onToggle, onDelete, api }) {
   }
 
   const isDone = task.status === 'done'
+  const isOverdue =
+    Boolean(task.due_at) && !isDone && new Date(task.due_at) < new Date()
 
   return (
     <>
@@ -84,6 +86,14 @@ export default function TaskItem({ task, onToggle, onDelete, api }) {
                     ? 'secondary'
                     : 'default'
               }
+            />
+          )}
+          {isOverdue && (
+            <Chip
+              label="Просрочено"
+              size="small"
+              color="error"
+              sx={{ ml: 1 }}
             />
           )}
         </ListItemButton>
