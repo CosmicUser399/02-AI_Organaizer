@@ -20,6 +20,10 @@
 - OpenAI API (Chat + Embeddings)
 - Pydantic (валидация данных)
 
+Для совместимости OpenAI SDK используется фиксированная пара
+`openai==1.47.0` и `httpx==0.27.2`. Не обновляйте эти зависимости
+по отдельности без проверки запуска backend.
+
 ### Frontend
 - React 18
 - Vite (сборщик)
@@ -117,7 +121,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Запустите сервер
-uvicorn app.main:app --reload --port 18080
+python -m uvicorn app.main:app --reload --port 18080
 ```
 
 Backend будет доступен по адресу: http://localhost:18080
@@ -243,6 +247,10 @@ docker-compose down -v
 # Пересборка образов
 docker-compose build
 
+# Пересборка backend после изменения Python-зависимостей
+docker-compose build --no-cache backend
+docker-compose up -d backend
+
 # Просмотр логов
 docker-compose logs -f
 
@@ -264,8 +272,40 @@ docker-compose exec frontend npm run lint
 - `GET /tasks` - получить список задач
 - `PATCH /tasks/{id}` - обновить задачу
 - `DELETE /tasks/{id}` - удалить задачу
+- `POST /tasks/parse` - создать задачу через Magic Input
+- `POST /tasks/{id}/decompose` - сгенерировать чек-лист через AI
+- `GET/POST/PATCH/DELETE /notes` - CRUD заметок с AI-автотегами
+- `GET /notes/{id}/suggested-tasks` - предложить связанные задачи
 
-*(полный список endpoints будет дополнен по мере разработки)*
+Коллекционные URL должны использовать завершающий `/`, например
+`/api/tasks/` и `/api/notes/`, чтобы избежать HTTP 307 через Docker-прокси.
+
+## Устранение типовых проблем
+
+### Backend возвращает HTTP 500 или не запускается
+
+Проверьте логи:
+
+```bash
+docker-compose logs --since 5m backend
+```
+
+Если встречается `unexpected keyword argument 'proxies'`,
+пересоберите backend без кэша:
+
+```bash
+docker-compose build --no-cache backend
+docker-compose up -d backend
+```
+
+В `backend/requirements.txt` версии `openai` и `httpx` зафиксированы
+совместимой парой. Не обновляйте их по отдельности без проверки SDK.
+
+### `validateDOMNesting` в консоли браузера
+
+`ListItemText.secondary` в MUI по умолчанию рендерится как `<p>`.
+Не помещайте внутрь него `Box`, `Chip` или другие блочные элементы.
+Размещайте теги и подобный контент в отдельном соседнем контейнере.
 
 ## База данных
 

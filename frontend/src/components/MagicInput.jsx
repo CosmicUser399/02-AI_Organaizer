@@ -10,9 +10,11 @@ import {
   ListItemText,
   Typography,
   Collapse,
+  CircularProgress,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import HistoryIcon from '@mui/icons-material/History'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 
 const HISTORY_KEY = 'magic_input_history'
 const MAX_HISTORY_ITEMS = 10
@@ -80,18 +82,25 @@ export default function MagicInput({ onSubmit, disabled }) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => setShowHistory(history.length > 0)}
-          placeholder="Опишите задачу на естественном языке..."
+          placeholder="Опишите задачу на естественном языке... (AI извлечёт детали)"
           variant="outlined"
           disabled={disabled}
           size="medium"
+          helperText={disabled ? 'Обработка с помощью AI...' : ''}
         />
         <Button
           type="submit"
           variant="contained"
           disabled={!input.trim() || disabled}
-          startIcon={<AddIcon />}
+          startIcon={
+            disabled ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              <AutoAwesomeIcon />
+            )
+          }
         >
-          Добавить
+          {disabled ? 'AI обрабатывает...' : 'Добавить'}
         </Button>
       </Box>
 

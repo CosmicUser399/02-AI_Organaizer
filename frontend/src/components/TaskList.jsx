@@ -1,7 +1,13 @@
 import { List, Paper, Typography, Button, Box } from '@mui/material'
 import TaskItem from './TaskItem'
 
-export default function TaskList({ tasks, onToggle, onDelete, onClearAll }) {
+export default function TaskList({
+  tasks,
+  onToggle,
+  onDelete,
+  onClearAll,
+  api,
+}) {
   if (tasks.length === 0) {
     return (
       <Paper sx={{ p: 3, textAlign: 'center' }}>
@@ -21,6 +27,7 @@ export default function TaskList({ tasks, onToggle, onDelete, onClearAll }) {
             task={task}
             onToggle={onToggle}
             onDelete={onDelete}
+            api={api}
           />
         ))}
       </List>

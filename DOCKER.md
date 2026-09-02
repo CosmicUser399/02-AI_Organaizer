@@ -111,6 +111,10 @@ docker-compose build
 # Пересобрать конкретный сервис
 docker-compose build backend
 
+# Пересобрать backend после изменения requirements.txt
+docker-compose build --no-cache backend
+docker-compose up -d backend
+
 # Пересобрать без использования кеша
 docker-compose build --no-cache
 
@@ -211,7 +215,7 @@ docker system prune -a --volumes
 4. Для добавления новых зависимостей:
    - Backend: обновите `requirements.txt` и пересоберите:
      ```bash
-     docker-compose build backend
+     docker-compose build --no-cache backend
      docker-compose up -d backend
      ```
    - Frontend: обновите `package.json` и пересоберите:
@@ -286,6 +290,27 @@ docker-compose -f docker-compose.prod.yml restart backend
 ```
 
 ## Troubleshooting
+
+### Ошибка `unexpected keyword argument 'proxies'`
+
+Эта ошибка означает несовместимость версии OpenAI SDK с `httpx`
+или использование старого Docker-слоя зависимостей. В проекте
+зафиксирована совместимая пара `openai==1.47.0` и `httpx==0.27.2`.
+После изменения зависимостей выполните:
+
+```bash
+docker-compose build --no-cache backend
+docker-compose up -d backend
+docker-compose logs --since 1m backend
+```
+
+В логах должен появиться `Application startup complete`.
+
+### Warning `validateDOMNesting` в React
+
+MUI `ListItemText.secondary` по умолчанию создаёт HTML-элемент `<p>`.
+Не помещайте внутрь него `Box`, `Chip` и другие блочные компоненты.
+Размещайте такой контент отдельным соседом `ListItemText`.
 
 ### Контейнер не запускается
 

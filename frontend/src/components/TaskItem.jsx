@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   ListItem,
   ListItemButton,
@@ -6,10 +7,16 @@ import {
   Checkbox,
   IconButton,
   Chip,
+  Box,
+  Tooltip,
 } from '@mui/material'
 import DeleteIcon from '@mui/icons-material/Delete'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import ChecklistDialog from './ChecklistDialog'
 
-export default function TaskItem({ task, onToggle, onDelete }) {
+export default function TaskItem({ task, onToggle, onDelete, api }) {
+  const [checklistOpen, setChecklistOpen] = useState(false)
+
   const handleToggle = () => {
     onToggle(task.id)
   }
@@ -19,43 +26,74 @@ export default function TaskItem({ task, onToggle, onDelete }) {
     onDelete(task.id)
   }
 
+  const handleOpenChecklist = (e) => {
+    e.stopPropagation()
+    setChecklistOpen(true)
+  }
+
   const isDone = task.status === 'done'
 
   return (
-    <ListItem
-      disablePadding
-      secondaryAction={
-        <IconButton edge="end" aria-label="delete" onClick={handleDelete}>
-          <DeleteIcon />
-        </IconButton>
-      }
-    >
-      <ListItemButton onClick={handleToggle} dense>
-        <ListItemIcon>
-          <Checkbox edge="start" checked={isDone} tabIndex={-1} disableRipple />
-        </ListItemIcon>
-        <ListItemText
-          primary={task.title}
-          sx={{
-            textDecoration: isDone ? 'line-through' : 'none',
-            color: isDone ? 'text.disabled' : 'text.primary',
-          }}
-        />
-        {task.tag && (
-          <Chip
-            label={task.tag}
-            size="small"
-            sx={{ ml: 1 }}
-            color={
-              task.tag === 'work'
-                ? 'primary'
-                : task.tag === 'personal'
-                  ? 'secondary'
-                  : 'default'
-            }
+    <>
+      <ListItem
+        disablePadding
+        secondaryAction={
+          <Box>
+            <Tooltip title="Разбить на шаги">
+              <IconButton
+                edge="end"
+                aria-label="decompose"
+                onClick={handleOpenChecklist}
+                sx={{ mr: 1 }}
+              >
+                <AutoAwesomeIcon />
+              </IconButton>
+            </Tooltip>
+            <IconButton edge="end" aria-label="delete" onClick={handleDelete}>
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        }
+      >
+        <ListItemButton onClick={handleToggle} dense>
+          <ListItemIcon>
+            <Checkbox
+              edge="start"
+              checked={isDone}
+              tabIndex={-1}
+              disableRipple
+            />
+          </ListItemIcon>
+          <ListItemText
+            primary={task.title}
+            secondary={task.description}
+            sx={{
+              textDecoration: isDone ? 'line-through' : 'none',
+              color: isDone ? 'text.disabled' : 'text.primary',
+            }}
           />
-        )}
-      </ListItemButton>
-    </ListItem>
+          {task.tag && (
+            <Chip
+              label={task.tag}
+              size="small"
+              sx={{ ml: 1 }}
+              color={
+                task.tag === 'work'
+                  ? 'primary'
+                  : task.tag === 'personal'
+                    ? 'secondary'
+                    : 'default'
+              }
+            />
+          )}
+        </ListItemButton>
+      </ListItem>
+      <ChecklistDialog
+        open={checklistOpen}
+        onClose={() => setChecklistOpen(false)}
+        task={task}
+        api={api}
+      />
+    </>
   )
 }

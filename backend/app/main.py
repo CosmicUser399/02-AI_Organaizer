@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
-from app.routers import tasks
+from app.routers import tasks, notes
 
 # Configure logging
 logging.basicConfig(
@@ -50,6 +50,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(tasks.router, prefix="/api")
+app.include_router(notes.router, prefix="/api")
 
 
 @app.get("/")

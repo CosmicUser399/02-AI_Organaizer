@@ -33,7 +33,9 @@ class TaskUpdate(BaseModel):
     tag: Optional[str] = Field(None, max_length=50)
     is_urgent: Optional[bool] = None
     is_important: Optional[bool] = None
-    status: Optional[str] = Field(None, pattern="^(pending|in_progress|done)$")
+    status: Optional[str] = Field(
+        None, pattern="^(pending|in_progress|done)$"
+    )
 
 
 class TaskResponse(TaskBase):
@@ -73,6 +75,21 @@ class ChecklistItemResponse(ChecklistItemBase):
 
     class Config:
         from_attributes = True
+
+
+class ChecklistItemUpdate(BaseModel):
+    """Schema for updating a checklist item."""
+
+    text: Optional[str] = None
+    is_done: Optional[bool] = None
+    position: Optional[int] = None
+
+
+class DecomposeResponse(BaseModel):
+    """Schema for task decomposition response."""
+
+    checklist_items: list[ChecklistItemResponse]
+    suggestions: list[str]
 
 
 # Note schemas

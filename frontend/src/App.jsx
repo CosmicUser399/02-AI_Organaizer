@@ -6,16 +6,20 @@ import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 import theme from './theme'
 import api from './api/client'
 import MagicInput from './components/MagicInput'
 import TaskList from './components/TaskList'
+import NotesPanel from './components/NotesPanel'
 
 function App() {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [currentTab, setCurrentTab] = useState(0)
 
   useEffect(() => {
     loadTasks()
@@ -38,8 +42,8 @@ function App() {
     try {
       setSubmitting(true)
       setError(null)
-      const newTask = await api.post('/tasks/', {
-        title: input,
+      // Use AI parsing endpoint
+      const newTask = await api.post('/tasks/parse', {
         raw_input: input,
       })
       setTasks([newTask, ...tasks])
@@ -116,22 +120,39 @@ function App() {
             </Alert>
           )}
 
-          <Box sx={{ mb: 3 }}>
-            <MagicInput onSubmit={handleAddTask} disabled={submitting} />
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs
+              value={currentTab}
+              onChange={(e, newValue) => setCurrentTab(newValue)}
+            >
+              <Tab label="Задачи" />
+              <Tab label="Заметки" />
+            </Tabs>
           </Box>
 
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <TaskList
-              tasks={tasks}
-              onToggle={handleToggleTask}
-              onDelete={handleDeleteTask}
-              onClearAll={handleClearAll}
-            />
+          {currentTab === 0 && (
+            <>
+              <Box sx={{ mb: 3 }}>
+                <MagicInput onSubmit={handleAddTask} disabled={submitting} />
+              </Box>
+
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <TaskList
+                  tasks={tasks}
+                  onToggle={handleToggleTask}
+                  onDelete={handleDeleteTask}
+                  onClearAll={handleClearAll}
+                  api={api}
+                />
+              )}
+            </>
           )}
+
+          {currentTab === 1 && <NotesPanel api={api} />}
         </Box>
       </Container>
     </ThemeProvider>
