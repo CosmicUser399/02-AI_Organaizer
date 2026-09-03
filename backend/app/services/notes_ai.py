@@ -16,16 +16,16 @@ class NoteAnalysis(BaseModel):
     tags: list[str] = Field(
         ...,
         description=(
-            "3-5 relevant tags categorizing the note content "
-            "(e.g., idea, meeting, research, todo, personal)"
+            "3-5 релевантных тегов, категоризирующих содержание заметки "
+            "(например, идея, встреча, исследование, задача, личное)"
         ),
     )
     summary: str = Field(
-        ..., description="Brief 1-2 sentence summary of the note"
+        ..., description="Краткое резюме заметки в 1-2 предложениях"
     )
     key_topics: list[str] = Field(
         default_factory=list,
-        description="Main topics or entities mentioned in the note",
+        description="Основные темы или объекты, упомянутые в заметке",
     )
 
 
@@ -48,15 +48,16 @@ def analyze_note(title: str, content: str) -> NoteAnalysis:
     """
     logger.info("Analyzing note: %s", title)
 
-    system_message = """You are a note analysis assistant.
-Extract relevant tags and key information from notes.
+    system_message = """Ты — помощник по анализу заметок.
+Извлекай релевантные теги и ключевую информацию из заметок.
 
-Guidelines:
-- tags: Use 3-5 descriptive tags (lowercase, single words or phrases)
-- Common tag categories: work, personal, idea, meeting, research,
-  todo, learning, finance, health, project, goal
-- summary: Concise 1-2 sentence summary capturing main points
-- key_topics: Extract main topics, names, or entities mentioned
+Рекомендации:
+- tags: Используй 3-5 описательных тегов (строчными буквами,
+  одно слово или фразы)
+- Общие категории тегов: работа, личное, идея, встреча, исследование,
+  задача, обучение, финансы, здоровье, проект, цель
+- summary: Краткое резюме в 1-2 предложениях, отражающее основные моменты
+- key_topics: Извлеки основные темы, имена или объекты, упомянутые в заметке
 """
 
     note_text = f"Title: {title}\n\nContent: {content}"
@@ -122,22 +123,20 @@ TRANSFORM_MODES = (
 
 _TRANSFORM_INSTRUCTIONS = {
     "summarize": (
-        "Summarize the following text concisely in the same "
-        "language. Keep key facts. Return only the summary."
+        "Сделай краткое резюме следующего текста на том же языке. "
+        "Сохрани ключевые факты. Верни только резюме."
     ),
     "fix_grammar": (
-        "Fix grammar, spelling, and punctuation. Keep the same "
-        "language, meaning, and approximate length. Return only "
-        "the corrected text."
+        "Исправь грамматику, орфографию и пунктуацию. Сохрани тот же "
+        "язык, смысл и примерную длину. Верни только исправленный текст."
     ),
     "tone_business": (
-        "Rewrite the text in a professional business tone. Keep "
-        "the same language and meaning. Return only the rewritten "
-        "text."
+        "Перепиши текст в профессиональном деловом тоне. Сохрани "
+        "тот же язык и смысл. Верни только переписанный текст."
     ),
     "tone_friendly": (
-        "Rewrite the text in a friendly, warm tone. Keep the same "
-        "language and meaning. Return only the rewritten text."
+        "Перепиши текст в дружелюбном, теплом тоне. Сохрани тот же "
+        "язык и смысл. Верни только переписанный текст."
     ),
 }
 

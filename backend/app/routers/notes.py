@@ -3,11 +3,11 @@
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.exceptions import raise_openai_http
 from app.services.embeddings import index_note, search_notes
 from app.services.notes_ai import (
@@ -19,6 +19,46 @@ from app.services.notes_ai import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notes", tags=["notes"])
+
+
+def _process_note_ai(
+    note_id: int,
+    analyze_tags: bool,
+) -> None:
+    """Run non-critical AI note processing after the response."""
+    db = SessionLocal()
+    try:
+        db_note = (
+            db.query(models.Note).filter(models.Note.id == note_id).first()
+        )
+        if db_note is None:
+            return
+
+        if analyze_tags and not db_note.tags:
+            try:
+                analysis = analyze_note(db_note.title, db_note.content)
+                db_note.tags = analysis.tags
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                logger.warning(
+                    "Failed to auto-tag note id=%d in background: %s",
+                    note_id,
+                    str(exc),
+                )
+
+        try:
+            index_note(db, db_note)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "Failed to index note id=%d in background: %s",
+                note_id,
+                str(exc),
+            )
+    finally:
+        db.close()
 
 
 @router.get("/", response_model=List[schemas.NoteResponse])
@@ -119,6 +159,7 @@ def get_note(
 )
 def create_note(
     note: schemas.NoteCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> models.Note:
     """
@@ -137,31 +178,12 @@ def create_note(
     logger.info("Creating new note: %s", note.title)
 
     note_data = note.model_dump()
-
-    if not note_data.get("tags"):
-        try:
-            analysis = analyze_note(note.title, note.content)
-            note_data["tags"] = analysis.tags
-            logger.info("Auto-generated %d tags for note", len(analysis.tags))
-        except Exception as e:
-            logger.warning("Failed to auto-tag note: %s", str(e))
-
     db_note = models.Note(**note_data)
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
 
-    try:
-        index_note(db, db_note)
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        logger.warning(
-            "Failed to index new note id=%d: %s",
-            db_note.id,
-            str(exc),
-        )
-        db.refresh(db_note)
+    background_tasks.add_task(_process_note_ai, db_note.id, True)
 
     logger.info("Note created successfully with id=%d", db_note.id)
     return db_note
@@ -171,6 +193,7 @@ def create_note(
 def update_note(
     note_id: int,
     note_update: schemas.NoteUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> models.Note:
     """
@@ -205,16 +228,6 @@ def update_note(
     content_changed = "content" in update_data
     tags_provided = "tags" in update_data
 
-    if content_changed and not tags_provided:
-        try:
-            new_title = update_data.get("title", db_note.title)
-            new_content = update_data.get("content", db_note.content)
-            analysis = analyze_note(new_title, new_content)
-            update_data["tags"] = analysis.tags
-            logger.info("Re-generated %d tags for note", len(analysis.tags))
-        except Exception as e:
-            logger.warning("Failed to auto-tag note: %s", str(e))
-
     for field, value in update_data.items():
         setattr(db_note, field, value)
 
@@ -222,17 +235,11 @@ def update_note(
     db.refresh(db_note)
 
     if content_changed:
-        try:
-            index_note(db, db_note)
-            db.commit()
-        except Exception as exc:
-            db.rollback()
-            logger.warning(
-                "Failed to reindex note id=%d: %s",
-                note_id,
-                str(exc),
-            )
-            db.refresh(db_note)
+        background_tasks.add_task(
+            _process_note_ai,
+            note_id,
+            not tags_provided,
+        )
 
     logger.info("Note with id=%d updated successfully", note_id)
     return db_note

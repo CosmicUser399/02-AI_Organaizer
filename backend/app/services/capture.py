@@ -13,25 +13,27 @@ logger = logging.getLogger(__name__)
 class ParsedTask(BaseModel):
     """Structured output from Magic Input parsing."""
 
-    title: str = Field(..., description="Short task title (max 100 chars)")
+    title: str = Field(
+        ..., description="Краткий заголовок задачи (не более 100 символов)"
+    )
     description: str | None = Field(
-        None, description="Detailed task description or context"
+        None, description="Подробное описание задачи или контекст"
     )
     due_at: datetime | None = Field(
-        None, description="Due date/time in ISO format if mentioned"
+        None, description="Дата и время выполнения в формате ISO"
     )
     tag: str | None = Field(
         None,
         description=(
-            "Category tag: work, personal, health, learning, "
-            "finance, shopping, other"
+            "Тег категории: работа, личное, здоровье, обучение, "
+            "финансы, покупки, другое"
         ),
     )
     is_urgent: bool = Field(
-        False, description="True if requires immediate attention"
+        False, description="True если требуется немедленное внимание"
     )
     is_important: bool = Field(
-        False, description="True if has significant impact/consequences"
+        False, description="True если имеет значительное влияние/последствия"
     )
 
 
@@ -54,22 +56,22 @@ def parse_magic_input(raw_input: str) -> ParsedTask:
     """
     logger.info("Parsing magic input: %s", raw_input[:50])
 
-    system_message = """You are an intelligent task parser.
-Extract structured task information from natural language input.
+    system_message = """Ты — интеллектуальный парсер задач.
+Извлекай структурированную информацию о задаче из текста на естественном языке.
 
-Guidelines:
-- title: Make it concise and actionable (verb + object)
-- description: Extract additional context, requirements, notes
-- due_at: Parse relative dates (today, tomorrow, next week, etc.)
-         and absolute dates. Use ISO format with current timezone.
-- tag: Categorize as work/personal/health/learning/finance/shopping
-       or other
-- is_urgent: True if words like "urgent", "ASAP", "immediately",
-            "critical" appear or deadline is very soon
-- is_important: True if task has significant consequences, affects
-               others, or relates to goals/priorities
+Рекомендации:
+- title: Сделай заголовок кратким и действенным (глагол + объект)
+- description: Извлеки дополнительный контекст, требования, заметки
+- due_at: Распознавай относительные даты (сегодня, завтра, через неделю и т.д.)
+         и абсолютные даты. Используй ISO формат с текущим часовым поясом.
+- tag: Категоризируй как работа/личное/здоровье/обучение/финансы/покупки
+       или другое
+- is_urgent: True если встречаются слова "срочно", "ASAP", "немедленно",
+            "критично" или срок очень скоро
+- is_important: True если задача имеет значительные последствия, влияет
+               на других или связана с целями/приоритетами
 
-Current datetime: {now}
+Текущие дата и время: {now}
 """.format(
         now=datetime.now().isoformat()
     )

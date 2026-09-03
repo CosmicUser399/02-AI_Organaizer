@@ -43,9 +43,11 @@
 - **Node.js + npm** — окружение и пакетный менеджер.
 - **React** — UI-библиотека.
 - **Material UI v6 (MUI)** — компоненты интерфейса; кастомная тема
-  (`src/theme.js`): шрифт Inter, цветовая схема indigo (`#4f46e5`) /
-  emerald (`#10b981`), переопределения Button, Paper, Chip, Tab.
-- **@fontsource/inter** — самохостируемый шрифт Inter (400, 600),
+  «Deep Space» (`src/theme.js`): тёмный режим (`mode: 'dark'`),
+  electric blue (`#60a5fa`) / neon cyan (`#22d3ee`), glassmorphism
+  Paper (`backdropFilter: blur(12px)`), gradient-кнопки с glow,
+  gradient Tab-индикатор, тонкий фоновый radial-gradient на `body`.
+- **@fontsource/inter** — самохостируемый шрифт Inter (400, 600, 700),
   подключён в `src/main.jsx`; не CDN.
 - **Vite** — сборка и dev-сервер (`npm run dev/build/preview`).
 - **ESLint + Prettier** — линтер и форматтер JS/JSX.
@@ -215,12 +217,12 @@ DOM-вложенность). Пример правильного использ�
         insights.py
       services/
         openai_client.py     # обёртка над OpenAI SDK
-        capture.py            # парсинг Magic Input -> задача
-        decompose.py           # разбивка задачи на шаги/подсказки
-        notes_ai.py             # автотеги, связи, форматирование
+        capture.py            # парсинг Magic Input -> задача (русский)
+        decompose.py           # разбивка задачи на шаги (русский)
+        notes_ai.py             # автотеги, связи, форматирование (русский)
         embeddings.py            # embeddings, cosine similarity
-        scheduler.py              # приоритеты (Эйзенхауэр), reschedule
-        digest.py                  # вечерний дайджест
+        scheduler.py              # приоритеты, reschedule (русский)
+        digest.py                  # вечерний дайджест (русский)
     requirements.txt
     pyproject.toml         # ruff/black/isort (line-length=79)
     Dockerfile             # образ для backend
@@ -228,14 +230,15 @@ DOM-вложенность). Пример правильного использ�
   frontend/
     src/
       main.jsx              # точка входа, импорт @fontsource/inter
-      App.jsx               # persistent tabs, ConfirmDialog
-      theme.js              # кастомная MUI тема (Inter, indigo/emerald)
+      App.jsx               # persistent tabs, ConfirmDialog, handleUpdateTask
+      theme.js              # кастомная MUI тема «Deep Space» (Inter, dark mode)
       utils.js              # formatDue, formatDate, getPriorityColor
       api/client.js         # fetch-обёртка, baseURL через Vite proxy
       components/
         MagicInput.jsx      # Escape/click-outside, кнопка очистки истории
-        TaskList.jsx / TaskItem.jsx  # due_at, цветная полоса приоритета
-        ChecklistDialog.jsx
+        TaskList.jsx / TaskItem.jsx  # due_at, glow-полоса приоритета, кнопка редактирования
+        EditTaskDialog.jsx  # диалог редактирования задачи (новый)
+        ChecklistDialog.jsx # inline-редактирование шагов
         ConfirmDialog.jsx   # заменяет window.confirm во всех компонентах
         NotesPanel.jsx / NoteEditor.jsx / AskNotesBar.jsx
         Planner.jsx           # матрица Эйзенхауэра / фокус на день
@@ -272,6 +275,24 @@ embedding, чтобы семантический поиск находил ко�
 При расчёте процента выполнения за день учитывается прогресс по
 подзадачам: задача с выполненными 5 из 10 пунктов чек-листа считается
 как 50% выполненной.
+
+### Асинхронная обработка заметок
+
+CRUD-операции заметок используют двухэтапную обработку:
+
+1. Заголовок, содержимое, теги и связь с задачей фиксируются в SQLite,
+   после чего API сразу возвращает сохранённую заметку.
+2. Автотегирование через Chat API и переиндексация абзацев через
+   Embeddings API запускаются в фоновой задаче с отдельной SQLAlchemy
+   сессией.
+
+Это разделяет обязательную персистентность и необязательные AI-операции:
+временная недоступность OpenAI не отменяет сохранение заметки.
+
+При построении дайджеста статистика полностью считывается из SQLite до
+вызова OpenAI. После чтения DB-сессия закрывается, чтобы длительный
+сетевой запрос не удерживал SQLite read-lock и не блокировал записи
+из других запросов.
 
 ### Резервное копирование и защита данных
 
@@ -313,22 +334,25 @@ cron (Linux/macOS) для ежедневного запуска.
 
 ## Точки интеграции с OpenAI
 
-1. **Magic Input** — парсинг свободного текста в структурированную
-   задачу (`title`, `due_at`, `tag`).
-2. **Декомпозиция задач** — генерация чек-листа шагов и
-   контекстных подсказок по недостающим подзадачам; пользователь
-   может добавлять, редактировать и удалять подзадачи.
-3. **Автотегирование заметок** — теги и предложение связей с
-   задачами/проектами при создании/редактировании заметки.
+**Все AI-генерируемые тексты создаются на русском языке.**
+
+1. **Magic Input** — парсинг свободного текста на русском языке в
+   структурированную задачу (`title`, `due_at`, `tag`).
+2. **Декомпозиция задач** — генерация чек-листа шагов и контекстных
+   подсказок на русском языке; пользователь может добавлять,
+   редактировать (inline-режим) и удалять подзадачи.
+3. **Автотегирование заметок** — теги на русском языке и предложение
+   связей с задачами/проектами при создании/редактировании заметки.
 4. **Семантический поиск** — эмбеддинги вопроса и абзацев заметок,
-   выдача релевантных фрагментов с AI-ответом ("Спроси свои заметки").
+   выдача релевантных фрагментов с AI-ответом на русском языке
+   ("Спроси свои заметки").
 5. **Быстрое форматирование** — summary / исправление грамматики /
-   смена тона для выделенного фрагмента заметки.
+   смена тона для выделенного фрагмента заметки на русском языке.
 6. **Smart Rescheduling** — анализ загруженности дня и предложение
-   нового окна для просроченной задачи.
+   нового окна для просроченной задачи на русском языке.
 7. **Вечерний дайджест** — агрегация статистики дня (% выполнения
    с учётом прогресса по подзадачам, продуктивные часы) и генерация
-   текстового отчёта-рекомендации.
+   текстового отчёта-рекомендации на русском языке.
 
 ## API (обзор эндпоинтов)
 
@@ -356,6 +380,97 @@ cron (Linux/macOS) для ежедневного запуска.
   при изменении решений в ходе реализации файл следует обновлять.
 
 ## История изменений
+
+### 03.09.2026 — Ускорение сохранения заметок
+
+- CRUD заметок сначала фиксирует данные в SQLite и сразу возвращает
+  ответ клиенту.
+- Автотеги и переиндексация embeddings выполняются после ответа в
+  фоновой задаче с отдельной SQLAlchemy-сессией.
+- В `digest.py` DB-сессия закрывается до вызова OpenAI, чтобы не
+  удерживать SQLite read-lock во время сетевого запроса.
+
+### 03.09.2026 — Русификация AI и редактирование задач/шагов
+
+**Полная русификация AI-промптов:** все AI-сервисы теперь генерируют
+текст на русском языке:
+- `capture.py` — парсинг Magic Input
+- `decompose.py` — декомпозиция задач на шаги
+- `notes_ai.py` — анализ заметок, теги, форматирование текста
+- `scheduler.py` — предложения по переносу задач
+- `digest.py` — вечерний дайджест
+
+**Редактирование задач:** добавлен компонент `EditTaskDialog.jsx`
+для редактирования всех полей задачи (заголовок, описание, дата/время,
+категория, приоритеты). Кнопка редактирования добавлена в `TaskItem.jsx`.
+
+**Inline-редактирование шагов:** в `ChecklistDialog.jsx` реализован
+режим редактирования шагов чек-листа прямо в диалоге без
+дополнительных окон (кнопки ✓/✕, поддержка Enter/Escape).
+
+**Обновления компонентов:**
+- `TaskItem.jsx` — добавлена кнопка редактирования и импорт
+  `EditTaskDialog`
+- `TaskList.jsx` — добавлен проброс `onUpdate` для обновления задач
+- `App.jsx` — добавлен обработчик `handleUpdateTask`
+- `ChecklistDialog.jsx` — добавлены стейты и обработчики для
+  inline-редактирования шагов
+
+**Линтинг:** все изменения прошли проверку ruff/black/isort (backend)
+и eslint/prettier (frontend).
+
+---
+
+### 03.09.2026 — Dark Futuristic UI редизайн
+
+**Концепция «Deep Space»** — полный переход на тёмную тему без изменения
+логики, API и структуры компонентов.
+
+**`frontend/src/theme.js` — полная перезапись:**
+- `mode: 'dark'` активирован глобально.
+- Новая палитра: фон `#0a0f1e` (deep space), поверхности `#111827`,
+  primary `#60a5fa` (electric blue), secondary `#22d3ee` (neon cyan),
+  error `#f87171`, warning `#fbbf24`, text `#f1f5f9 / #94a3b8`.
+- **MuiPaper** — glassmorphism: `backgroundColor: rgba(17,24,39,0.85)`,
+  `backdropFilter: blur(12px)`, тонкая neon-граница.
+- **MuiButton** (containedPrimary) — gradient `#3b82f6 → #06b6d4` +
+  `boxShadow` glow; усиливается при hover.
+- **MuiTabs indicator** — gradient `#3b82f6 → #22d3ee` + glow.
+- **MuiTextField** — glow-рамка при фокусе через `boxShadow`.
+- **MuiDialog** — тёмный фон с neon-бордером.
+- **body** — тонкий radial-gradient фон (electric blue + cyan) с
+  `backgroundAttachment: fixed`.
+
+**`frontend/src/App.jsx` — header:**
+- Заголовок обёрнут в gradient Box с neon-рамкой.
+- Chip-счётчик задач — neon-стиль: `rgba(96,165,250,0.12)` фон,
+  полупрозрачная синяя граница.
+
+**`frontend/src/main.jsx`:**
+- Добавлен `import '@fontsource/inter/700.css'` (жирный начертание).
+
+**`frontend/src/components/TaskItem.jsx`:**
+- `PRIORITY_STRIPE_COLOR` (bgcolor) заменён на `PRIORITY_GLOW`
+  (`background + boxShadow`): красный / amber / синий glow в
+  зависимости от приоритета; при `isDone` полоска скрыта.
+
+**`frontend/src/components/DigestCard.jsx`:**
+- `LinearProgress` получил gradient fill `#3b82f6 → #22d3ee` и
+  glow `boxShadow` через `'& .MuiLinearProgress-bar'`.
+
+**`frontend/src/components/MagicInput.jsx`:**
+- Список истории — glassmorphic: `rgba(96,165,250,0.05)` фон +
+  neon-рамка; neon hover-эффект на элементах.
+
+**Компоненты без ручных правок** (`ConfirmDialog`, `ErrorAlert`,
+`EmptyState`, `TaskList`, `ChecklistDialog`, `Planner`, `NotesPanel`,
+`NoteEditor`, `AskNotesBar`) автоматически получили тёмную тему через
+`mode: 'dark'`.
+
+**`.cursor/rules/second.mdc`** — обновлены дизайн-токены и добавлена
+секция `3.5` с конвенциями glassmorphism/glow для будущих изменений.
+
+---
 
 ### 03.09.2026 — UI/UX + Backend рефакторинг
 

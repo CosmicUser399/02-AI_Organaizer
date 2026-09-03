@@ -224,6 +224,9 @@ def get_digest(
         return cached
 
     stats = collect_day_stats(db, day)
+    # Close DB connection before the potentially slow OpenAI call
+    # to avoid holding a SQLite read-lock that blocks writes.
+    db.close()
     try:
         text = _generate_digest_text(stats).strip()
     except Exception as exc:

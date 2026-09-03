@@ -29,15 +29,15 @@ class RescheduleProposal(BaseModel):
 
     suggested_due_at: datetime = Field(
         ...,
-        description="Proposed new due datetime in ISO format",
+        description="Предлагаемые новые дата и время в формате ISO",
     )
     reason: str = Field(
         ...,
-        description="Short explanation of why this slot fits",
+        description="Краткое объяснение, почему этот временной слот подходит",
     )
     day_load_summary: str = Field(
         ...,
-        description="Brief summary of remaining day load",
+        description="Краткое резюме оставшейся нагрузки на день",
     )
 
 
@@ -208,12 +208,12 @@ def _day_load_lines(db: Session, now: datetime) -> str:
         if due < now or due > horizon:
             continue
         lines.append(
-            f"- {task.title} (due {due.isoformat(timespec='minutes')}, "
-            f"urgent={bool(task.is_urgent)}, "
-            f"important={bool(task.is_important)})"
+            f"- {task.title} (срок {due.isoformat(timespec='minutes')}, "
+            f"срочно={bool(task.is_urgent)}, "
+            f"важно={bool(task.is_important)})"
         )
     if not lines:
-        return "No other timed tasks in the next two days."
+        return "Нет других задач с установленным временем в ближайшие два дня."
     return "\n".join(lines)
 
 
@@ -241,19 +241,19 @@ def propose_reschedule(
     load = _day_load_lines(db, now)
     due = as_naive(task.due_at)
     system_message = (
-        "You are a scheduling assistant. Suggest a realistic new "
-        "due datetime for an overdue task. Prefer a free slot later "
-        "today; if the day is packed, use tomorrow morning. Avoid "
-        "colliding with existing due times. Keep reason short."
+        "Ты — помощник по планированию. Предложи реалистичные новые "
+        "дату и время для просроченной задачи. Предпочитай свободный слот "
+        "позже сегодня; если день загружен, используй завтрашнее утро. "
+        "Избегай коллизий с существующими сроками. Делай объяснение кратким."
     )
     prompt = (
-        f"Current datetime: {now.isoformat(timespec='minutes')}\n"
-        f"Overdue task: {task.title}\n"
-        f"Original due_at: {due.isoformat() if due else 'unknown'}\n"
-        f"Urgent: {bool(task.is_urgent)}\n"
-        f"Important: {bool(task.is_important)}\n"
-        f"Description: {task.description or '-'}\n\n"
-        f"Existing load:\n{load}"
+        f"Текущие дата и время: {now.isoformat(timespec='minutes')}\n"
+        f"Просроченная задача: {task.title}\n"
+        f"Изначальный срок: {due.isoformat() if due else 'неизвестно'}\n"
+        f"Срочно: {bool(task.is_urgent)}\n"
+        f"Важно: {bool(task.is_important)}\n"
+        f"Описание: {task.description or '-'}\n\n"
+        f"Существующая нагрузка:\n{load}"
     )
     logger.info("Requesting reschedule proposal for task id=%d", task.id)
     proposal = openai_client.structured_completion(

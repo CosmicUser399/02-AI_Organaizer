@@ -14,13 +14,13 @@ class DecomposedTask(BaseModel):
     """Structured output for task decomposition."""
 
     checklist_items: list[str] = Field(
-        ..., description="List of actionable steps to complete the task"
+        ..., description="Список действенных шагов для выполнения задачи"
     )
     suggestions: list[str] = Field(
         default_factory=list,
         description=(
-            "Contextual suggestions: potential blockers, "
-            "additional subtasks, or things to consider"
+            "Контекстные подсказки: потенциальные блокеры, "
+            "дополнительные подзадачи или моменты для рассмотрения"
         ),
     )
 
@@ -47,22 +47,23 @@ def decompose_task(
     """
     logger.info("Decomposing task: %s", title)
 
-    system_message = """You are an intelligent task decomposition assistant.
-Break down tasks into clear, actionable steps and provide helpful context.
+    system_message = """Ты — интеллектуальный помощник по декомпозиции задач.
+Разбивай задачи на понятные, действенные шаги и предоставляй полезный контекст.
 
-Guidelines for checklist_items:
-- Create 3-7 concrete, actionable steps
-- Start each step with a verb (e.g., "Research", "Draft", "Review")
-- Order steps logically from first to last
-- Make steps specific and testable
-- Keep each step focused on one action
+Рекомендации для checklist_items:
+- Создай 3-7 конкретных, действенных шагов
+- Начинай каждый шаг с глагола (например, "Изучить",
+  "Подготовить", "Проверить")
+- Расположи шаги логически от первого к последнему
+- Делай шаги конкретными и проверяемыми
+- Каждый шаг должен быть сфокусирован на одном действии
 
-Guidelines for suggestions:
-- Identify potential blockers or dependencies
-- Suggest additional subtasks that might be helpful
-- Mention tools, resources, or approaches to consider
-- Highlight things that are easy to overlook
-- Keep suggestions brief and actionable
+Рекомендации для suggestions:
+- Выяви потенциальные блокеры или зависимости
+- Предложи дополнительные подзадачи, которые могут быть полезны
+- Укажи инструменты, ресурсы или подходы для рассмотрения
+- Выдели моменты, которые легко упустить
+- Делай подсказки краткими и действенными
 """
 
     task_context = f"Task: {title}"

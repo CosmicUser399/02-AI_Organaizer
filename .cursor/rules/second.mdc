@@ -107,16 +107,21 @@ command: uvicorn app.main:app --host 0.0.0.0 --port 18080 --reload
 
 ## 3. UI/UX — тема и визуальный стиль
 
+Концепция: «Deep Space» — тёмный космический фон, электрически-синие
+акценты, glassmorphism-карточки, неоновые индикаторы приоритета,
+градиентные кнопки. Логика, API и структура компонентов не меняются.
+
 ### Цветовые токены (theme.js)
 
 ```javascript
 palette: {
-  primary:    { main: '#4f46e5' },  // indigo-600
-  secondary:  { main: '#10b981' },  // emerald-500
-  error:      { main: '#ef4444' },
-  warning:    { main: '#f59e0b' },
-  background: { default: '#f1f5f9', paper: '#ffffff' },
-  text:       { primary: '#0f172a', secondary: '#64748b' },
+  mode: 'dark',
+  primary:    { main: '#60a5fa' },   // electric blue
+  secondary:  { main: '#22d3ee' },   // neon cyan
+  error:      { main: '#f87171' },   // coral
+  warning:    { main: '#fbbf24' },   // amber
+  background: { default: '#0a0f1e', paper: '#111827' },
+  text:       { primary: '#f1f5f9', secondary: '#94a3b8' },
 }
 ```
 
@@ -124,24 +129,119 @@ palette: {
 
 - Шрифт: `'"Inter", "Roboto", sans-serif'`
 - Установить через `@fontsource/inter` (не CDN)
-- Импорт в `main.jsx`: `import '@fontsource/inter/400.css'`
-  и `import '@fontsource/inter/600.css'`
+- Импорт в `main.jsx`:
+  `import '@fontsource/inter/400.css'`
+  `import '@fontsource/inter/600.css'`
+  `import '@fontsource/inter/700.css'`
 
 ### MUI overrides — обязательный минимум
 
 ```javascript
 components: {
-  MuiButton:   { styleOverrides: { root: {
-    textTransform: 'none', fontWeight: 600, borderRadius: 8
+  MuiButton: { styleOverrides: {
+    root: {
+      textTransform: 'none', fontWeight: 600, borderRadius: 8,
+    },
+    containedPrimary: {
+      background: 'linear-gradient(135deg,#3b82f6 0%,#06b6d4 100%)',
+      boxShadow: '0 0 16px rgba(96,165,250,0.35)',
+      '&:hover': { boxShadow: '0 0 28px rgba(96,165,250,0.55)' },
+    },
+  }},
+  MuiPaper: { styleOverrides: { root: {
+    backgroundImage: 'none',
+    backgroundColor: 'rgba(17,24,39,0.85)',
+    backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(96,165,250,0.10)',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
   }}},
-  MuiPaper:    { styleOverrides: { root: {
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+  MuiChip: { styleOverrides: { root: { fontWeight: 500 }}},
+  MuiTab: { styleOverrides: { root: {
+    textTransform: 'none', fontWeight: 600,
   }}},
-  MuiChip:     { styleOverrides: { root: { fontWeight: 500 }}},
-  MuiTab:      { styleOverrides: { root: {
-    textTransform: 'none', fontWeight: 600
+  MuiTabs: { styleOverrides: { indicator: {
+    background: 'linear-gradient(90deg,#3b82f6,#22d3ee)',
+    height: 3,
+    borderRadius: '3px 3px 0 0',
+    boxShadow: '0 0 8px rgba(96,165,250,0.6)',
   }}},
 }
+```
+
+## 3.5 Glassmorphism и glow-конвенции
+
+### Paper — glassmorphism (уже включён в MUI override)
+
+```javascript
+// Не переопределять boxShadow/backgroundColor в sx отдельных
+// компонентов — использовать тему. Исключение: акцентные карточки.
+```
+
+### Шапка приложения — gradient header
+
+```jsx
+// App.jsx — обернуть заголовок в Box:
+<Box sx={{
+    background: 'linear-gradient(135deg,'
+        + 'rgba(59,130,246,0.08) 0%,'
+        + 'rgba(6,182,212,0.04) 100%)',
+    border: '1px solid rgba(96,165,250,0.12)',
+    borderRadius: 3, px: 3, py: 2.5, mb: 3,
+}}>
+```
+
+### Chip-счётчик задач — neon
+
+```jsx
+// App.jsx — Chip с открытыми задачами:
+<Chip
+    label={`${openCount} открытых`}
+    size="small"
+    sx={{
+        background: 'rgba(96,165,250,0.12)',
+        border: '1px solid rgba(96,165,250,0.30)',
+        color: 'primary.main',
+        fontWeight: 600,
+    }}
+/>
+```
+
+### Приоритетная полоска задачи — glow stripe
+
+```javascript
+// TaskItem.jsx — вместо bgcolor использовать background + boxShadow:
+const PRIORITY_GLOW = {
+    error:   { bg: '#ef4444', glow: 'rgba(239,68,68,0.5)' },
+    warning: { bg: '#f59e0b', glow: 'rgba(245,158,11,0.5)' },
+    primary: { bg: '#3b82f6', glow: 'rgba(59,130,246,0.5)' },
+    default: { bg: 'rgba(148,163,184,0.15)', glow: 'transparent' },
+};
+
+// Box-полоска:
+<Box sx={{
+    width: 4,
+    background: glow.bg,
+    boxShadow: `0 0 8px ${glow.glow}`,
+    borderRadius: '2px 0 0 2px',
+    flexShrink: 0,
+}} />
+```
+
+### LinearProgress — gradient (DigestCard)
+
+```jsx
+<LinearProgress
+    variant="determinate"
+    value={Math.min(percent, 100)}
+    sx={{
+        height: 8,
+        borderRadius: 4,
+        '& .MuiLinearProgress-bar': {
+            background: 'linear-gradient(90deg,#3b82f6,#22d3ee)',
+            boxShadow: '0 0 8px rgba(96,165,250,0.4)',
+        },
+    }}
+/>
 ```
 
 ## 4. Паттерны компонентов
