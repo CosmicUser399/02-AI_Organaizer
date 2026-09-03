@@ -42,8 +42,11 @@
 
 - **Node.js + npm** — окружение и пакетный менеджер.
 - **React** — UI-библиотека.
-- **Material UI (MUI)** — компоненты интерфейса (кнопки, списки,
-  диалоги, чипы тегов).
+- **Material UI v6 (MUI)** — компоненты интерфейса; кастомная тема
+  (`src/theme.js`): шрифт Inter, цветовая схема indigo (`#4f46e5`) /
+  emerald (`#10b981`), переопределения Button, Paper, Chip, Tab.
+- **@fontsource/inter** — самохостируемый шрифт Inter (400, 600),
+  подключён в `src/main.jsx`; не CDN.
 - **Vite** — сборка и dev-сервер (`npm run dev/build/preview`).
 - **ESLint + Prettier** — линтер и форматтер JS/JSX.
 - **localStorage** — хранение истории последних введённых строк
@@ -155,10 +158,29 @@ DELETE all). Запрос без завершающего `/` получает H
 перенаправить браузер на внутренний адрес `backend:18080`, который
 недоступен с хост-машины.
 
-Компоненты MUI, содержащие блочные элементы (`Box`, `Chip` и т.п.),
-не следует передавать в `ListItemText.secondary`: это свойство
-по умолчанию оборачивается в `<p>`. Для тегов и других блочных
-элементов используйте отдельный соседний контейнер.
+Компоненты MUI, содержащие вложенные элементы в `ListItemText.secondary`,
+должны использовать `component="span"` на всех узлах (свойство
+`secondary` оборачивается в `<p>`, блочные дочерние теги нарушают
+DOM-вложенность). Пример правильного использования — `TaskItem.jsx`.
+
+### Паттерны компонентов (зафиксированы после рефакторинга UI/UX)
+
+**Persistent tabs** — все три панели всегда монтируются в DOM; активная
+отображается через `sx={{ display: currentTab === N ? 'block' : 'none' }}`.
+Это предотвращает повторные fetch при переключении вкладок и сохраняет
+локальный стейт.
+
+**ConfirmDialog** — единственный способ подтверждения деструктивных
+действий. `window.confirm` запрещён в пользу компонента
+`ConfirmDialog.jsx` (`open`, `title`, `message`, `onConfirm`, `onCancel`,
+`severity`).
+
+**Прямой импорт api** — каждый компонент импортирует
+`api` из `'../api/client.js'` напрямую; передача `api` через props
+запрещена. Это устраняет prop-drilling и упрощает рефакторинг.
+
+**Утилиты форматирования** — `formatDue`, `formatDate`, `getPriorityColor`
+вынесены в `src/utils.js`; компоненты не дублируют эту логику.
 
 ## Структура проекта
 
@@ -205,14 +227,16 @@ DELETE all). Запрос без завершающего `/` получает H
     .dockerignore
   frontend/
     src/
-      main.jsx
-      App.jsx
-      theme.js
+      main.jsx              # точка входа, импорт @fontsource/inter
+      App.jsx               # persistent tabs, ConfirmDialog
+      theme.js              # кастомная MUI тема (Inter, indigo/emerald)
+      utils.js              # formatDue, formatDate, getPriorityColor
       api/client.js         # fetch-обёртка, baseURL через Vite proxy
       components/
-        MagicInput.jsx
-        TaskList.jsx / TaskItem.jsx
+        MagicInput.jsx      # Escape/click-outside, кнопка очистки истории
+        TaskList.jsx / TaskItem.jsx  # due_at, цветная полоса приоритета
         ChecklistDialog.jsx
+        ConfirmDialog.jsx   # заменяет window.confirm во всех компонентах
         NotesPanel.jsx / NoteEditor.jsx / AskNotesBar.jsx
         Planner.jsx           # матрица Эйзенхауэра / фокус на день
         DigestCard.jsx
@@ -332,6 +356,57 @@ cron (Linux/macOS) для ежедневного запуска.
   при изменении решений в ходе реализации файл следует обновлять.
 
 ## История изменений
+
+### 03.09.2026 — UI/UX + Backend рефакторинг
+
+**Тема и типографика:**
+- `theme.js` полностью переписан: палитра indigo/emerald, шрифт Inter
+  через `@fontsource/inter` (400, 600), `shape.borderRadius: 12`,
+  переопределения MuiButton, MuiPaper, MuiChip, MuiTab.
+- `@fontsource/inter` добавлен в `package.json`, импортируется в
+  `main.jsx`; CDN не используется.
+
+**App.jsx — persistent tabs и header:**
+- Условный рендер `{currentTab === N && <Panel />}` заменён на
+  `<Box sx={{ display: currentTab === N ? 'block' : 'none' }}>` для
+  всех трёх панелей; данные загружаются один раз при монтировании.
+- Добавлен чип-статус с количеством открытых задач.
+- `window.confirm` в `handleClearAll` заменён на `ConfirmDialog`.
+
+**Новые файлы:**
+- `src/utils.js` — `formatDue` (относительная дата: "сегодня 14:00",
+  "завтра 09:30", "5 дн. назад"), `formatDate`, `getPriorityColor`.
+- `src/components/ConfirmDialog.jsx` — MUI Dialog для подтверждения
+  деструктивных действий; заменяет `window.confirm` везде в проекте.
+
+**TaskItem.jsx:**
+- Цветная левая полоска: красная (urgent+important), amber (urgent),
+  indigo (important), серая (остальные) — через `getPriorityColor`.
+- `due_at` отображается под описанием с иконкой ⏰; красный цвет
+  при просрочке.
+- Добавлен чип приоритета (срочно / важно / важно+срочно).
+
+**MagicInput.jsx:**
+- Закрытие выпадающей истории по Escape и клику вне компонента
+  (`mousedown` listener через `useRef`).
+- Кнопка очистки всей истории.
+- Обновлён placeholder с примером запроса.
+
+**Устранение prop-drilling api:**
+- Все компоненты (`TaskList`, `TaskItem`, `ChecklistDialog`,
+  `NotesPanel`, `NoteEditor`, `AskNotesBar`, `Planner`, `DigestCard`)
+  импортируют `api` напрямую из `'../api/client.js'`; `api` удалён
+  из пропсов и цепочки передачи в `App.jsx`.
+
+**api/client.js:**
+- `Content-Type: application/json` добавляется только при наличии
+  тела запроса (`body !== undefined`); GET и DELETE-запросы отправляют
+  только `Accept: application/json`.
+
+**routers/tasks.py — идемпотентность декомпозиции:**
+- Перед созданием новых пунктов чек-листа удаляются все существующие
+  для данной задачи; повторный вызов "Разбить на шаги" не накапливает
+  дублирующие пункты.
 
 ### 03.09.2026 — Исправление персистентности данных и HMR в Docker
 

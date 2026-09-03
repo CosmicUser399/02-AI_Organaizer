@@ -54,10 +54,15 @@ async function request(endpoint, options = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  const defaultHeaders = { Accept: 'application/json' };
+  if (fetchOptions.body !== undefined) {
+    defaultHeaders['Content-Type'] = 'application/json';
+  }
+
   const config = {
     ...fetchOptions,
     headers: {
-      'Content-Type': 'application/json',
+      ...defaultHeaders,
       ...headers,
     },
     signal: controller.signal,

@@ -1,0 +1,215 @@
+---
+description: >-
+  Правила рефакторинга AI-Органайзера: Docker-конвенции, UI/UX-тема,
+  паттерны компонентов и ограничения безопасного изменения кода.
+  Применяется совместно с main.mdc на период рефакторинга.
+alwaysApply: true
+---
+
+# Refactoring Rules — AI-Органайзер
+
+Этот файл регламентирует конкретный рефакторинг из плана
+`.cursor/plans/ui_ux_&_docker_refactor_f7c5c20f.plan.md`.
+Применяется совместно с `main.mdc`; при конфликте приоритет
+у `main.mdc`.
+
+## 1. Границы рефакторинга
+
+### Что МОЖНО менять
+
+- `frontend/nginx.conf`, `docker-compose.yml`,
+  `docker-compose.prod.yml`, `backend/Dockerfile`,
+  `frontend/Dockerfile`
+- `backend/requirements.txt` (разделить на prod/dev)
+- `backend/app/main.py` (только CORS origins)
+- `backend/app/routers/tasks.py` (только decompose idempotency)
+- `frontend/src/theme.js`, `frontend/src/App.jsx`
+- Все файлы `frontend/src/components/*.jsx`
+- `frontend/src/api/client.js` (только Content-Type fix)
+- Новые файлы: `frontend/src/utils.js`,
+  `frontend/src/components/ConfirmDialog.jsx`
+- `frontend/package.json` (только `@fontsource/inter`)
+
+### Что НЕЛЬЗЯ трогать без отдельного согласования
+
+- Модель данных (`backend/app/models.py`)
+- Pydantic-схемы (`backend/app/schemas.py`)
+- AI-сервисы (`backend/app/services/`)
+- API-контракт (пути, методы, тела запросов и ответов)
+- `backend/app/config.py`, `backend/app/database.py`
+- Роутеры (кроме decompose в `tasks.py`)
+- `frontend/vite.config.js`
+
+## 2. Docker-конвенции
+
+### Healthcheck — только Python, без curl
+
+```dockerfile
+# ПРАВИЛЬНО (python:3.11-slim не содержит curl):
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s \
+  CMD python -c \
+  "import urllib.request; \
+   urllib.request.urlopen('http://localhost:18080/health')" \
+  || exit 1
+```
+
+```yaml
+# docker-compose.yml:
+healthcheck:
+  test: ["CMD", "python", "-c",
+    "import urllib.request; \
+     urllib.request.urlopen('http://localhost:18080/health')"]
+  interval: 15s
+  timeout: 5s
+  start_period: 30s
+  retries: 3
+```
+
+### nginx.conf — proxy_pass без trailing slash
+
+```nginx
+# ПРАВИЛЬНО — сохраняет /api в пути:
+location /api/ {
+    proxy_pass http://backend:18080;
+    proxy_read_timeout 120s;
+    proxy_connect_timeout 10s;
+}
+
+# НЕПРАВИЛЬНО — обрезает /api, даёт 404 в prod:
+location /api/ {
+    proxy_pass http://backend:18080/;
+}
+```
+
+### depends_on с ожиданием healthy
+
+```yaml
+frontend:
+  depends_on:
+    backend:
+      condition: service_healthy
+```
+
+### Dev-контейнер backend — обязателен --reload
+
+```yaml
+# docker-compose.yml (dev):
+command: uvicorn app.main:app --host 0.0.0.0 --port 18080 --reload
+```
+
+### Разделение requirements
+
+- `requirements-prod.txt` — только runtime-зависимости
+  (без ruff, black, isort)
+- `requirements-dev.txt` — содержит `-r requirements-prod.txt`
+  плюс lint-инструменты
+- `backend/Dockerfile` использует `requirements-prod.txt`
+
+## 3. UI/UX — тема и визуальный стиль
+
+### Цветовые токены (theme.js)
+
+```javascript
+palette: {
+  primary:    { main: '#4f46e5' },  // indigo-600
+  secondary:  { main: '#10b981' },  // emerald-500
+  error:      { main: '#ef4444' },
+  warning:    { main: '#f59e0b' },
+  background: { default: '#f1f5f9', paper: '#ffffff' },
+  text:       { primary: '#0f172a', secondary: '#64748b' },
+}
+```
+
+### Типографика
+
+- Шрифт: `'"Inter", "Roboto", sans-serif'`
+- Установить через `@fontsource/inter` (не CDN)
+- Импорт в `main.jsx`: `import '@fontsource/inter/400.css'`
+  и `import '@fontsource/inter/600.css'`
+
+### MUI overrides — обязательный минимум
+
+```javascript
+components: {
+  MuiButton:   { styleOverrides: { root: {
+    textTransform: 'none', fontWeight: 600, borderRadius: 8
+  }}},
+  MuiPaper:    { styleOverrides: { root: {
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+  }}},
+  MuiChip:     { styleOverrides: { root: { fontWeight: 500 }}},
+  MuiTab:      { styleOverrides: { root: {
+    textTransform: 'none', fontWeight: 600
+  }}},
+}
+```
+
+## 4. Паттерны компонентов
+
+### Нет prop-drilling для api
+
+```javascript
+// ПРАВИЛЬНО — прямой импорт в каждом компоненте:
+import api from '../api/client.js';
+
+// НЕПРАВИЛЬНО — получать api как prop:
+function TaskItem({ task, api }) { ... }
+```
+
+### Persistent tabs — не размонтировать при переключении
+
+```jsx
+// ПРАВИЛЬНО — компонент живёт в DOM, стейт сохраняется:
+<Box sx={{ display: currentTab === 0 ? 'block' : 'none' }}>
+  <TasksPanel ... />
+</Box>
+
+// НЕПРАВИЛЬНО — каждый switch = unmount + fetch:
+{currentTab === 0 && <TasksPanel ... />}
+```
+
+### Подтверждения — только через ConfirmDialog
+
+```javascript
+// НЕПРАВИЛЬНО:
+if (window.confirm('Удалить задачу?')) { ... }
+
+// ПРАВИЛЬНО — использовать компонент:
+<ConfirmDialog
+  open={confirmOpen}
+  title="Удалить задачу?"
+  message="Это действие нельзя отменить."
+  onConfirm={handleDelete}
+  onCancel={() => setConfirmOpen(false)}
+/>
+```
+
+### Общие утилиты — только из utils.js
+
+```javascript
+// Не дублировать formatDue / formatDate в разных компонентах:
+import { formatDue, formatDate, getPriorityColor }
+  from '../utils.js';
+```
+
+### Content-Type — не на GET/DELETE
+
+```javascript
+// api/client.js — добавлять заголовок только при наличии тела:
+const headers = { Accept: 'application/json' };
+if (body !== undefined) {
+  headers['Content-Type'] = 'application/json';
+}
+```
+
+## 5. Безопасность рефакторинга
+
+- После каждого изменённого файла backend запускать:
+  `ruff check .` + `black --check .` + `isort --check-only .`
+- После изменений frontend: `npm run lint` + `npm run format:check`
+- Не менять API-контракт (URL, методы, тела) — только внутренние
+  детали реализации
+- Не удалять существующие компоненты — только рефакторить
+  и дополнять
+- Каждый уровень плана (Docker → Theme → UX → Backend fixes)
+  выполнять последовательно, не смешивать

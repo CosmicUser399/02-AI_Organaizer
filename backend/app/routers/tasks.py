@@ -301,6 +301,12 @@ def decompose_task_endpoint(
             fallback="Не удалось разбить задачу на шаги.",
         )
 
+    # Delete existing checklist items to ensure idempotency
+    db.query(models.ChecklistItem).filter(
+        models.ChecklistItem.task_id == task_id
+    ).delete()
+    db.commit()
+
     # Create checklist items
     created_items = []
     for position, text in enumerate(decomposed.checklist_items):

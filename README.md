@@ -43,9 +43,11 @@
 ### Frontend
 
 - React 18, Vite
-- Material UI
+- Material UI v6 — кастомная тема: шрифт Inter (`@fontsource/inter`),
+  цветовая схема indigo/emerald, переопределения MUI-компонентов
 - ESLint + Prettier
 - все HTTP-запросы только через `src/api/client.js`
+- общие утилиты форматирования — `src/utils.js`
 
 ## Переменные окружения
 
@@ -140,6 +142,8 @@ npm run dev
 ├── frontend/
 │   ├── src/
 │   │   ├── api/client.js
+│   │   ├── theme.js
+│   │   ├── utils.js
 │   │   └── components/
 │   ├── vite.config.js
 │   └── package.json
@@ -230,8 +234,10 @@ docker-compose up -d frontend
 
 ### `validateDOMNesting` в консоли
 
-Не кладите `Box`/`Chip` в `ListItemText.secondary` — MUI оборачивает
-его в `<p>`.
+Если передаёте JSX в `ListItemText.secondary`, используйте
+`component="span"` на всех вложенных элементах (MUI оборачивает
+`secondary` в `<p>`, блочные элементы внутри него вызывают ошибку).
+Пример правильного использования — `TaskItem.jsx`.
 
 ## База данных
 
